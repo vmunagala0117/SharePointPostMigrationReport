@@ -111,6 +111,7 @@
     <Compile Include="SPConnection.cs" />
     <Compile Include="SPField.cs" />
     <Compile Include="SPListItem.cs" />
+    <Compile Include="SPListView.cs" />
     <Compile Include="SPListItemCount.cs" />
     <Compile Include="SPWebPart.cs" />
     <Compile Include="UserMapping.cs" />

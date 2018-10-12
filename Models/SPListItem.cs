@@ -10,9 +10,11 @@ namespace Common
     {
         public string ID { get; set; }
         public string Title { get; set; }
+        public string Name { get; set; }
         public string FileDirRef { get; set; }
         public string FileRef { get; set; }
         public DateTime ModifiedDate { get; set; }
+        public string EncodedAbsUrl { get; set; }
         //public string FileType { get; set; }
     }
 }

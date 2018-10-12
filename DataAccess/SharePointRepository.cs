@@ -13,6 +13,8 @@ using NLog;
 using Microsoft.SharePoint.Client.WebParts;
 using Polly;
 using Microsoft.SharePoint.Client.UserProfiles;
+using System.Threading;
+
 
 namespace DataAccess
 {
@@ -61,6 +63,24 @@ namespace DataAccess
             try
             {
                 ClientContext cc = new AuthenticationManager().GetSharePointOnlineAuthenticatedContextTenant(siteUrl, tenantUser, tenantUserPassword);
+                return cc;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public ClientContext GetSP2013Context(string siteUrl, string userName, string passWord, string domain)
+        {
+            try
+            {
+                //const System.Security.Authentication.SslProtocols _Tls12 = (System.Security.Authentication.SslProtocols)0x00000C00;
+                //const System.Net.SecurityProtocolType Tls12 = (System.Net.SecurityProtocolType)_Tls12;
+                System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Ssl3 | System.Net.SecurityProtocolType.Tls | System.Net.SecurityProtocolType.Tls11 | System.Net.SecurityProtocolType.Tls12;
+
+                ClientContext cc = new AuthenticationManager().GetNetworkCredentialAuthenticatedContext(siteUrl, userName, passWord, domain);
+                cc.ExecuteQuery();
                 return cc;
             }
             catch (Exception ex)
@@ -326,7 +346,7 @@ namespace DataAccess
                 {
                     cc.Load(user.Alerts);
                     cc.ExecuteQuery();
-                    foreach(var alert in user.Alerts)
+                    foreach (var alert in user.Alerts)
                     {
                         var alertResult = new SPAlert();
                         alertResult.Title = alert.Title;
@@ -535,13 +555,14 @@ namespace DataAccess
         {
             try
             {
-                var retValue = retryPolicy.Execute(() =>
+                //var retValue = retryPolicy.Execute(() =>  {
+                var list = cc.Web.GetListByTitle(listName);
+                logger.Log(LogLevel.Info, $"Processing Site:{cc.Url};List:{listName};ListItem:{listItem.FileRef}");
+
+                CamlQuery camlQuery = new CamlQuery();
+                if (list.BaseType == BaseType.DocumentLibrary)
                 {
-                    var list = cc.Web.GetListByTitle(listName);
-                    CamlQuery camlQuery = new CamlQuery();
-                    if (list.BaseType == BaseType.DocumentLibrary)
-                    {
-                        camlQuery.ViewXml = @"<View Scope='RecursiveAll'>
+                    camlQuery.ViewXml = @"<View Scope='RecursiveAll'>
                                         <Query>
                                             <Where>
                                                 <And>
@@ -552,19 +573,19 @@ namespace DataAccess
                                         </Query>
                                        </View>";
 
-                        //camlQuery.ViewXml = @"<View Scope='RecursiveAll'>
-                        //                <Query>
-                        //                    <Where>                                            
-                        //                         <Eq><FieldRef Name='FSObjType'/><Value Type='Lookup'>1</Value></Eq>                                            
-                        //                    </Where>
-                        //                </Query>
-                        //               </View>";
-                    }
-                    else
-                    {
-                        //check for Title
-                        if (!String.IsNullOrEmpty(listItem.Title) && (!listItem.Title.Contains("<") || !listItem.Title.Contains(">")))
-                            camlQuery.ViewXml = @"<View Scope='RecursiveAll'>
+                    //camlQuery.ViewXml = @"<View Scope='RecursiveAll'>
+                    //                <Query>
+                    //                    <Where>                                            
+                    //                         <Eq><FieldRef Name='FSObjType'/><Value Type='Lookup'>1</Value></Eq>                                            
+                    //                    </Where>
+                    //                </Query>
+                    //               </View>";
+                }
+                else
+                {
+                    //check for Title
+                    if (!String.IsNullOrEmpty(listItem.Title) && (!listItem.Title.Contains("<") || !listItem.Title.Contains(">")))
+                        camlQuery.ViewXml = @"<View Scope='RecursiveAll'>
                                         <Query>
                                             <Where>
                                                 <And>
@@ -574,8 +595,8 @@ namespace DataAccess
                                             </Where>
                                         </Query>
                                        </View>";
-                        else
-                            camlQuery.ViewXml = @"<View Scope='RecursiveAll'>
+                    else
+                        camlQuery.ViewXml = @"<View Scope='RecursiveAll'>
                                         <Query>
                                             <Where>
                                                 <And>
@@ -585,21 +606,37 @@ namespace DataAccess
                                             </Where>
                                         </Query>
                                        </View>";
+                }
+
+                var listItems = list.GetItems(camlQuery);
+                cc.Load(listItems);
+                int retryCount = 5;
+                while (retryCount > 0)
+                {
+                    try
+                    {
+                        cc.ExecuteQuery();
+                        retryCount = 0;
                     }
-
-                    var listItems = list.GetItems(camlQuery);
-                    cc.Load(listItems);
-                    cc.ExecuteQuery();
-                    if (listItems.Count >= 1)
-                    {                        
-                        return true;
+                    catch (Exception ex)
+                    {
+                        logger.Log(LogLevel.Error, ex, $"RetryError: {retryCount} For Site:{cc.Url};List:{listName};ListItem:{listItem.FileRef}");
+                        retryCount--;
+                        Thread.Sleep(1000);
+                        if (retryCount == 0)
+                            throw ex;
                     }
-                    else
-                        return false;
+                }
 
-                });
+                if (listItems.Count >= 1)
+                {
+                    return true;
+                }
+                else
+                    return false;
 
-                return retValue;
+                //});
+                //return retValue;
             }
             catch (Exception ex)
             {
@@ -677,7 +714,7 @@ namespace DataAccess
                     cc.Load(listItems);
                     cc.ExecuteQuery();
                     if (listItems.Count >= 1)
-                    {                        
+                    {
                         return true;
                     }
                     else
@@ -779,6 +816,43 @@ namespace DataAccess
             else
                 return false;
         }
+
+        public List<string> GetListViews(ClientContext cc, string listName)
+        {
+            var results = new List<string>();
+            try
+            {
+                var list = cc.Web.GetListByTitle(listName);
+                var views = cc.LoadQuery(list.Views.Include(v => v.Title, v => v.Id, v => v.Hidden));
+                cc.ExecuteQuery();
+                foreach (var view in views)
+                {
+                    results.Add(view.Title);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Log(LogLevel.Error, ex, cc.Url);
+            }
+            return results;
+        }
+
+        public bool CheckIfListViewExists(ClientContext cc, string listName, string viewName)
+        {
+            try
+            {
+                var list = cc.Web.GetListByTitle(listName);
+                var view = list.GetViewByName(viewName);
+                if (view == null)
+                    return false;
+                else
+                    return true;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
         #endregion
 
         private Dictionary<string, string> ParseSchemaXml(string schemaXml)
@@ -806,12 +880,12 @@ namespace DataAccess
 
         private void GetNavNodes(ClientContext cc, NavigationNodeCollection navigationNodes)
         {
-            foreach(var navNode in navigationNodes)
+            foreach (var navNode in navigationNodes)
             {
                 //Console.Write(navNode.Title, navNode.Url, navNode.Id, cc.Web.Url)
                 cc.Load(navNode.Children);
                 cc.ExecuteQuery();
-                if(navNode.Children.Count > 0)
+                if (navNode.Children.Count > 0)
                 {
                     GetNavNodes(cc, navNode.Children);
                 }
@@ -819,12 +893,11 @@ namespace DataAccess
         }
 
         //TODO: Get Web Permissions
-
         private void GetWebPermissions(ClientContext cc)
         {
             var roleAssignments = cc.LoadQuery(cc.Web.RoleAssignments.Include(r => r.Member, r => r.Member.PrincipalType,
                                                                             r => r.RoleDefinitionBindings.Include(b => b.Name)));
-            foreach(var roleAssignment in roleAssignments)
+            foreach (var roleAssignment in roleAssignments)
             {
                 if (roleAssignment.Member.PrincipalType == Microsoft.SharePoint.Client.Utilities.PrincipalType.User)
                 {

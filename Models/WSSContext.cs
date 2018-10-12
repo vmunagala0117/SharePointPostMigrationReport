@@ -76,8 +76,8 @@ namespace Common
         private void GetWebParts()
         {
             WSSWebPartPages = new WSSWebPartPages.WebPartPagesWebService();
-            WSSViews.Url = CurrentWebUrl + "/_vti_bin/WebPartPages.asmx";
-            WSSViews.Credentials = GetCredentialObject();
+            WSSWebPartPages.Url = CurrentWebUrl + "/_vti_bin/WebPartPages.asmx";
+            WSSWebPartPages.Credentials = GetCredentialObject();
         }
 
         private ICredentials GetCredentialObject()

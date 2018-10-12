@@ -12,6 +12,8 @@ using System.Xml;
 using System.Xml.Linq;
 using System.ServiceModel;
 using System.ServiceModel.Channels;
+using System.IO;
+using HtmlAgilityPack;
 
 namespace DataAccess
 {
@@ -121,7 +123,7 @@ namespace DataAccess
                 ndViewFields.InnerXml = "<FieldRef Name='EncodedAbsUrl' /> " +
                               "<FieldRef Name='LinkFilename' /> <FieldRef Name = 'Author' />" +
                               "<FieldRef Name='Editor' /> <FieldRef Name = 'Created' />" +
-                              "<FieldRef Name='Modified' /> <FieldRef Name = 'ID' /> <FieldRef Name = 'Title' />" +
+                              "<FieldRef Name='Modified' /> <FieldRef Name = 'ID' /> <FieldRef Name = 'Title' /> <FieldRef Name = 'Name' />" +
                               "<FieldRef Name='FileRef' /> <FieldRef Name = 'FileDirRef' />";
 
                 ndQueryOptions.InnerXml = "<ViewAttributes Scope='RecursiveAll' IncludeRootFolder='True' />";
@@ -146,11 +148,13 @@ namespace DataAccess
                                     {
                                         results.Add(new SPListItem()
                                         {
-                                            FileDirRef = objReader["ows_FileDirRef"].ToString(),
-                                            FileRef = objReader["ows_FileRef"].ToString(),
+                                            FileDirRef = objReader["ows_FileDirRef"].ToString().Contains(";#") ? objReader["ows_FileDirRef"].ToString().Split(new string[] { ";#" }, StringSplitOptions.None)[1] : objReader["ows_FileDirRef"].ToString(),
+                                            FileRef = objReader["ows_FileRef"].ToString().Contains(";#") ? objReader["ows_FileRef"].ToString().Split(new string[] { ";#" }, StringSplitOptions.None)[1] : objReader["ows_FileRef"].ToString(),
                                             ID = objReader["ows_ID"],
                                             ModifiedDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.Parse(objReader["ows_Modified"].ToString()), timeZoneInfo),
-                                            Title = objReader["ows_Title"]
+                                            Title = objReader["ows_Title"],
+                                            Name = objReader["ows_Name"],
+                                            EncodedAbsUrl = objReader["ows_EncodedAbsUrl"]
                                         });
                                     }
                                 }
@@ -176,7 +180,7 @@ namespace DataAccess
         {
             try
             {
-                //Get Lists
+                //Get List
                 XmlNode xn = SPContext.WSSLists.GetList(listName);
                 var elements = xn.GetChildElements();
                 var fieldsElement = elements.FirstOrDefault(e => e.Name.LocalName.Equals("Fields"));
@@ -197,6 +201,24 @@ namespace DataAccess
             }
         }
 
+        public IEnumerable<string> GetListViews(string listName)
+        {
+            try
+            {
+                //Get List
+                XmlNode xn = SPContext.WSSViews.GetViewCollection(listName);
+                var elements = xn.GetChildElements();
+                var views = elements.Where(e => e.Attribute("Hidden") == null || (e.Attribute("Hidden") != null && e.Attribute("Hidden").Value.ToLower() != "true"))
+                                    .Select(e => e.Attribute("DisplayName").Value);
+                return views.ToList();
+            }
+            catch (Exception ex)
+            {
+                logger.Log(LogLevel.Error, ex, $"Site:{SPContext.WSSUserGroup.Url}");
+                throw ex;
+            }
+        }
+
         public List<SPWebPart> GetWikiPageWebParts()
         {
             try
@@ -206,33 +228,39 @@ namespace DataAccess
                 XmlNode xn = SPContext.WSSLists.GetListCollection();
                 var elements = xn.GetChildElements();
                 //filter out reserved or hidden lists
+
                 var lists = elements
                     .Where(e => (e.Attribute("Hidden") == null || (e.Attribute("Hidden") != null && e.Attribute("Hidden").Value.ToLower() != "true")) &&
-                           (e.Attribute("BaseTemplate").Value == "119" || e.Attribute("BaseTemplate").Value == "850"))
+                           (e.Attribute("ServerTemplate").Value == "119" || e.Attribute("ServerTemplate").Value == "850"))
                     .Select(e => e.Attribute("Title").Value);
-
 
                 foreach (var list in lists)
                 {
                     var getItems = GetListItems(list);
                     foreach (var item in getItems)
                     {
-                        XmlNode xnWebPartProps = SPContext.WSSWebPartPages.GetWebPartProperties2(item.FileRef, Common.WSSWebPartPages.Storage.Shared, Common.WSSWebPartPages.SPWebServiceBehavior.Version3);
-                        var webPropsElements = xn.GetChildElements();
-                        var wpProps = webPropsElements.Select(e => new
+
+                        string getWebPageResponseString = SPContext.WSSWebPartPages.GetWebPartPage(item.EncodedAbsUrl, Common.WSSWebPartPages.SPWebServiceBehavior.Version3);
+
+                        if (string.IsNullOrEmpty(getWebPageResponseString))
+                            continue;
+
+                        HtmlAgilityPack.HtmlDocument htmlDocument = new HtmlAgilityPack.HtmlDocument();
+                        htmlDocument.LoadHtml(getWebPageResponseString);
+                        var webPartNodes = htmlDocument.DocumentNode.SelectNodes("//webpart");
+                        if (webPartNodes == null)
+                            continue;
+                        foreach(var webPart in webPartNodes)
                         {
-                            Title = e.Attribute("Title").Value,
-                            IsHidden = e.Attribute("Hidden").Value,
-                            IsClosed = e.Attribute("IsClosed").Value
-                        });
-                        foreach (var wpProp in wpProps)
-                        {
+                            var title = webPart.SelectSingleNode("title").InnerText;
+                            var isVisible = webPart.SelectSingleNode("isvisible").InnerText;
+                            //var isClosed = webPart.SelectSingleNode("isincluded").InnerText;
                             results.Add(new SPWebPart
                             {
                                 FileRelativeUrl = item.FileRef,
-                                WebPartTitle = wpProp.Title,
-                                WebPartStatus = (wpProp.IsHidden.ToLower() == "true") ? WebPartStatus.Hidden : (wpProp.IsClosed.ToLower() == "true") ? WebPartStatus.Closed : WebPartStatus.Present
-                            });
+                                WebPartTitle = title,
+                                WebPartStatus = (isVisible.ToLower() == "false") ? WebPartStatus.Hidden : WebPartStatus.Present
+                            });                            
                         }
                     }
                 }
@@ -290,8 +318,10 @@ namespace DataAccess
             try
             {
                 XmlNode xn = SPContext.WSSWebs.GetAllSubWebCollection();
+                //XmlNode xn = SPContext.WSSWebs.GetWebCollection();
                 var elements = xn.GetChildElements();
-                var webs = elements.Select(e => e.Attribute("Url").Value);
+                var currentWebUrl = SPContext.WSSWebs.Url.Replace("/_vti_bin/Webs.asmx", "");
+                var webs = elements.Where(e => e.Attribute("Url").Value.StartsWith(currentWebUrl)).Select(e => e.Attribute("Url").Value);
                 return webs;
             }
             catch (FaultException fe)

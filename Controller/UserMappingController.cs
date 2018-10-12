@@ -14,6 +14,10 @@ namespace Controller
     public class UserMappingController : IUserMapping
     {
         private List<UserMapping> UserMappingsList { get; set; }
+        public UserMappingController()
+        {
+            UserMappingsList = new List<UserMapping>();
+        }
         public UserMappingController(string filePath)
         {
             using (var csv = new CsvReader(File.OpenText(filePath)))

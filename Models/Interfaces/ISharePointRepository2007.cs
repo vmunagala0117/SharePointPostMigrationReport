@@ -21,5 +21,6 @@ namespace Common.Interfaces
         IEnumerable<string> GetAllWebUrls();
         IEnumerable<string> GetSiteContentTypes();
         IDictionary<string, List<string>> GetWebUserGroups();
+        IEnumerable<string> GetListViews(string listName);
     }
 }

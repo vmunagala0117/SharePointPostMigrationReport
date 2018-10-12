@@ -91,15 +91,19 @@ namespace Controller
             this.SourceSiteCreds = sourceCreds;
             this.TargetSiteCreds = targetCreds;
 
-            if (sourceCreds.SiteType != SiteType.WSS)
-                this.SourceClientContext = this.SharePointRepository.GetSPOContext(SourceSiteCreds.SiteUrl, SourceSiteCreds.UserName, SourceSiteCreds.Password);
-            else
+            if (sourceCreds.SiteType == SiteType.WSS)
                 this.SourceWSSContext = this.SharePointRepository2007.GetSPContext(SourceSiteCreds.SiteUrl, SourceSiteCreds.UserName, SourceSiteCreds.Password);
-
-            if (targetCreds.SiteType != SiteType.WSS)
-                this.TargetClientContext = this.SharePointRepository.GetSPOContext(TargetSiteCreds.SiteUrl, TargetSiteCreds.UserName, TargetSiteCreds.Password);
+            else if (sourceCreds.SiteType == SiteType.SharePointOnPremises)
+                this.SourceClientContext = this.SharePointRepository.GetSP2013Context(SourceSiteCreds.SiteUrl, SourceSiteCreds.UserName, SourceSiteCreds.Password, SourceSiteCreds.Domain);
             else
+                this.SourceClientContext = this.SharePointRepository.GetSPOContext(SourceSiteCreds.SiteUrl, SourceSiteCreds.UserName, SourceSiteCreds.Password);
+
+            if (targetCreds.SiteType == SiteType.WSS)
                 this.TargetWSSContext = this.SharePointRepository2007.GetSPContext(TargetSiteCreds.SiteUrl, TargetSiteCreds.UserName, TargetSiteCreds.Password);
+            else if (targetCreds.SiteType == SiteType.SharePointOnPremises)
+                this.TargetClientContext = this.SharePointRepository.GetSP2013Context(TargetSiteCreds.SiteUrl, TargetSiteCreds.UserName, TargetSiteCreds.Password, TargetSiteCreds.Domain);
+            else
+                this.TargetClientContext = this.SharePointRepository.GetSPOContext(TargetSiteCreds.SiteUrl, TargetSiteCreds.UserName, TargetSiteCreds.Password);
 
             this.UserMapping = userMapping;
             this.logger = logger;
@@ -204,6 +208,53 @@ namespace Controller
             return results;
         }
 
+        public List<SPListView> MissingListViews()
+        {
+            var results = new List<SPListView>();
+            foreach (var list in this.GetExistingLists)
+            {
+                try
+                {
+                    IEnumerable<string> listViews = null;
+                    if (SourceSiteCreds.SiteType == SiteType.WSS)
+                    {
+                        listViews = this.SharePointRepository2007.GetListViews(list);
+                    }
+                    else
+                    {
+                        listViews = this.SharePointRepository.GetListViews(SourceClientContext, list);
+                    }
+                    foreach (var listView in listViews)
+                    {
+                        if (!this.SharePointRepository.CheckIfListViewExists(TargetClientContext, list, listView))
+                        {
+                            results.Add(new SPListView
+                            {
+                                ListName = list,
+                                ViewName = listView
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.Log(LogLevel.Error, ex);
+                }
+            }
+            return results;
+        }
+
+        #region TEST
+        private void GetListItemsInventory(string list)
+        {
+            List<SPListItem> listItems = this.SharePointRepository2007.GetListItems(list);
+            CsvWriterHelper.WriteCsvRecords(listItems, System.IO.Path.Combine(@"D:\Logs", "2007ListItems.csv"));
+
+            List<SPListItem> listItems2 = this.SharePointRepository.GetListItems(TargetClientContext, list);
+            CsvWriterHelper.WriteCsvRecords(listItems2, System.IO.Path.Combine(@"D:\Logs", "2013ListItems.csv"));
+        }
+        #endregion
+
         //CORRECT MODULE
         public List<SPListItem> MissingListItems()
         {
@@ -212,17 +263,44 @@ namespace Controller
             {
                 try
                 {
+                    #region Test - REMOVE
+                    /*if (list == "Documents")
+                        GetListItemsInventory(list);*/
+                    #endregion
+
                     IEnumerable<SPListItem> listItems = null;
                     if (SourceSiteCreds.SiteType == SiteType.WSS)
                     {
-                        this.SharePointRepository2007.GetListItems(list);
+                        listItems = this.SharePointRepository2007.GetListItems(list);
                     }
                     else
                     {
                         listItems = this.SharePointRepository.GetListItems(SourceClientContext, list);
                     }
+
+                    string targetHost = new Uri(this.TargetSiteCreds.SiteUrl).GetLeftPart(UriPartial.Authority);
+                    string targetRootSiteRelativeUrl = this.TargetSiteCreds.SiteUrl.Replace(targetHost, "");
+                    if (!String.IsNullOrEmpty(this.TargetSiteCreds.WebRelativeUrl))
+                        targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Replace(this.TargetSiteCreds.WebRelativeUrl, "");
+
+                    if (targetRootSiteRelativeUrl.EndsWith("/"))
+                        targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Substring(0, targetRootSiteRelativeUrl.Length - 1);
+
                     foreach (var listItem in listItems)
                     {
+                        //check if the listItem is starting with current web's relative URL?
+                        if (!listItem.FileDirRef.StartsWith(targetRootSiteRelativeUrl) && !listItem.FileRef.StartsWith(targetRootSiteRelativeUrl))
+                        {
+                            if (listItem.FileDirRef.StartsWith("/"))
+                                listItem.FileDirRef = listItem.FileDirRef.Substring(1);
+
+                            if (listItem.FileRef.StartsWith("/"))
+                                listItem.FileRef = listItem.FileRef.Substring(1);
+
+                            listItem.FileDirRef = targetRootSiteRelativeUrl + "/" + listItem.FileDirRef;
+                            listItem.FileRef = targetRootSiteRelativeUrl + "/" + listItem.FileRef;
+                        }
+
                         if (!this.SharePointRepository.GetListItemExists(TargetClientContext, list, listItem))
                         {
                             logger.Log(LogLevel.Info, $"Missing ListItem:{listItem.FileRef};List:{list}");
@@ -329,11 +407,37 @@ namespace Controller
             var results = new List<SPWebPart>();
             try
             {
-                var spWebParts = this.SharePointRepository.GetWikiPageWebParts(SourceClientContext);
+                var spWebParts = new List<SPWebPart>();
+                if (SourceSiteCreds.SiteType == SiteType.WSS)
+                {
+                    spWebParts = this.SharePointRepository2007.GetWikiPageWebParts();
+                }
+                else
+                {
+                    spWebParts = spWebParts = this.SharePointRepository.GetWikiPageWebParts(SourceClientContext);
+                }
+
+                string targetHost = new Uri(this.TargetSiteCreds.SiteUrl).GetLeftPart(UriPartial.Authority);
+                string targetRootSiteRelativeUrl = this.TargetSiteCreds.SiteUrl.Replace(targetHost, "");
+                if (!String.IsNullOrEmpty(this.TargetSiteCreds.WebRelativeUrl))
+                    targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Replace(this.TargetSiteCreds.WebRelativeUrl, "");
+
+                if (targetRootSiteRelativeUrl.EndsWith("/"))
+                    targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Substring(0, targetRootSiteRelativeUrl.Length - 1);
+
                 foreach (var webPart in spWebParts)
                 {
                     if (webPart.WebPartStatus == WebPartStatus.Present)
                     {
+                        if (!webPart.FileRelativeUrl.StartsWith(targetRootSiteRelativeUrl))
+                        {
+                            
+                            if (webPart.FileRelativeUrl.StartsWith("/"))
+                                webPart.FileRelativeUrl = webPart.FileRelativeUrl.Substring(1);
+
+                            webPart.FileRelativeUrl = targetRootSiteRelativeUrl + "/" + webPart.FileRelativeUrl;
+                        }
+
                         if (!this.SharePointRepository.CheckIfWebPartPresent(TargetClientContext, webPart.FileRelativeUrl, webPart.WebPartTitle))
                         {
                             results.Add(new SPWebPart()

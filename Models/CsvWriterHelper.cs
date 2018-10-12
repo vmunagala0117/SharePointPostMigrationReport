@@ -47,6 +47,14 @@ namespace Common
                     csv.WriteRecords(records);
                 }
             }
+            else if (t == typeof(SPListView))
+            {
+                using (var csv = new CsvWriter(File.CreateText(fullPathFileName)))
+                {
+                    csv.Configuration.RegisterClassMap<SPListViewClassMap>();
+                    csv.WriteRecords(records);
+                }
+            }
             else if (t == typeof(SPWebPart))
             {
                 using (var csv = new CsvWriter(File.CreateText(fullPathFileName)))

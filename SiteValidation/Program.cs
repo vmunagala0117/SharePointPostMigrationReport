@@ -22,7 +22,7 @@ namespace SiteValidation
         public static CsvWriter csv = null;
         public static DirectoryInfo dirInfo = null;
 
-        private static readonly ILogger logger = LogManager.GetCurrentClassLogger();       
+        private static readonly ILogger logger = LogManager.GetCurrentClassLogger();
 
         static void Main(string[] args)
         {
@@ -34,10 +34,10 @@ namespace SiteValidation
                 container.RegisterType<ISharePointListValidationService, ListValidationServiceController>();
                 container.RegisterType<IUserMapping, UserMappingController>();
 
-                IUserMapping userMapping = null;
+                //TODO: What id userMapping is empty.. currently its set to an empty constructor.
+                IUserMapping userMapping = new UserMappingController();
                 if (!String.IsNullOrEmpty(ConfigurationManager.AppSettings["UserMappingFilePath"]))
                 {
-                    container.RegisterType<IUserMapping, UserMappingController>();
                     userMapping = container.Resolve<IUserMapping>(
                        new ParameterOverrides
                        {
@@ -55,9 +55,9 @@ namespace SiteValidation
                     var targetSiteUrl = ConfigurationManager.AppSettings["TargetSiteHost"] + sRelativeUrl;
 
                     //initialize source connection object
-                    var srcSPCredObject = new SPConnection(ConfigurationManager.AppSettings["SourceSiteType"], sourceSiteUrl, ConfigurationManager.AppSettings["SourceUserName"], ConfigurationManager.AppSettings["SourcePassword"]);
-                    var tgtSPCredObject = new SPConnection(ConfigurationManager.AppSettings["TargetSiteType"], targetSiteUrl, ConfigurationManager.AppSettings["TargetUserName"], ConfigurationManager.AppSettings["TargetPassword"]);
-                    
+                    var srcSPCredObject = new SPConnection(ConfigurationManager.AppSettings["SourceSiteType"], sourceSiteUrl, sRelativeUrl, ConfigurationManager.AppSettings["SourceUserName"], ConfigurationManager.AppSettings["SourcePassword"]);
+                    var tgtSPCredObject = new SPConnection(ConfigurationManager.AppSettings["TargetSiteType"], targetSiteUrl, sRelativeUrl, ConfigurationManager.AppSettings["TargetUserName"], ConfigurationManager.AppSettings["TargetPassword"]);
+
                     var spWebValidationService = container.Resolve<ISharePointWebValidationService>(
                         new ParameterOverrides
                         {
@@ -77,7 +77,8 @@ namespace SiteValidation
                         });
 
                     //Create base directory first based on the siteRelativeUrl
-                    dirInfo = Directory.CreateDirectory(ConfigurationManager.AppSettings["LogDirectory"] + sRelativeUrl);
+                    var targetFilePath = Path.Combine(ConfigurationManager.AppSettings["LogDirectory"], (targetSiteUrl.Contains("https://") ? targetSiteUrl.Replace("https://", "") : targetSiteUrl.Replace("http://", "")));
+                    dirInfo = Directory.CreateDirectory(targetFilePath);
 
                     //Get missing Sites from the site collection
                     logger.Log(LogLevel.Info, $"Validating Sites and Lists for {targetSiteUrl}");
@@ -89,7 +90,7 @@ namespace SiteValidation
                         CsvWriterHelper.WriteCsvRecords(missingSites, Path.Combine(dirInfo.FullName, "missingSites.csv"));
 
                     //Perform site collection operations
-                    SiteCollectionValidationOperations(spWebValidationService);
+                    //SiteCollectionValidationOperations(spWebValidationService);
 
                     //Perform web & list operations
                     var webUrls = spWebValidationService.GetAllSourceWebUrls();
@@ -116,22 +117,22 @@ namespace SiteValidation
                         var webUri = new Uri(webUrl, true);
                         var relativeUri = sourceHostUri.MakeRelativeUri(webUri);
 
-                        dirInfo = Directory.CreateDirectory(Path.Combine(ConfigurationManager.AppSettings["LogDirectory"], relativeUri.ToString()));
+                        dirInfo = Directory.CreateDirectory(Path.Combine(targetFilePath, relativeUri.ToString()));
 
                         if (webUrl == sourceSiteUrl)
                         {
                             WebValidationOperations(spWebValidationService);
                             ListValidationOperations(spListValidationService);
                             continue;
-                        }                        
+                        }
 
                         targetSiteUrl = ConfigurationManager.AppSettings["TargetSiteHost"] + "/" + relativeUri.ToString();
 
                         //initialize source connection object
-                        srcSPCredObject = new SPConnection(ConfigurationManager.AppSettings["SourceSiteType"], webUrl, ConfigurationManager.AppSettings["SourceUserName"], ConfigurationManager.AppSettings["SourcePassword"]);
-                        tgtSPCredObject = new SPConnection(ConfigurationManager.AppSettings["TargetSiteType"], targetSiteUrl, ConfigurationManager.AppSettings["TargetUserName"], ConfigurationManager.AppSettings["TargetPassword"]);
+                        srcSPCredObject = new SPConnection(ConfigurationManager.AppSettings["SourceSiteType"], webUrl, relativeUri.ToString(), ConfigurationManager.AppSettings["SourceUserName"], ConfigurationManager.AppSettings["SourcePassword"]);
+                        tgtSPCredObject = new SPConnection(ConfigurationManager.AppSettings["TargetSiteType"], targetSiteUrl, relativeUri.ToString(), ConfigurationManager.AppSettings["TargetUserName"], ConfigurationManager.AppSettings["TargetPassword"]);
 
-                        
+
                         logger.Log(LogLevel.Info, $"Validating Sites and Lists for {targetSiteUrl}");
 
                         spWebValidationService = container.Resolve<ISharePointWebValidationService>(
@@ -163,7 +164,7 @@ namespace SiteValidation
             }
         }
         private static void WebValidationOperations(ISharePointWebValidationService spWebValidationService)
-        {            
+        {
             logger.Log(LogLevel.Info, $"Checking for missing web groups");
             var missingGroups = spWebValidationService.MissingGroups();
             if (missingGroups.Count > 0)
@@ -172,11 +173,11 @@ namespace SiteValidation
             logger.Log(LogLevel.Info, $"Checking for missing users in groups");
             var missingUsersInGroups = spWebValidationService.MissingUsersInGroups();
             if (missingUsersInGroups.Count > 0)
-                CsvWriterHelper.WriteCsvRecords(missingUsersInGroups, Path.Combine(dirInfo.FullName, "missingUsersInGroups.csv"));            
+                CsvWriterHelper.WriteCsvRecords(missingUsersInGroups, Path.Combine(dirInfo.FullName, "missingUsersInGroups.csv"));
         }
 
         private static void SiteCollectionValidationOperations(ISharePointWebValidationService spWebValidationService)
-        {            
+        {
             logger.Log(LogLevel.Info, $"Checking for site user permissions");
             var mismatchUserPerms = spWebValidationService.CheckUserPermissions();
             if (mismatchUserPerms.Count > 0)
@@ -191,11 +192,11 @@ namespace SiteValidation
             var missingSiteColumns = spWebValidationService.MissingSiteColumns();
             if (missingSiteColumns.Count > 0)
                 CsvWriterHelper.WriteCsvRecords(missingSiteColumns, Path.Combine(dirInfo.FullName, "missingSiteColumns.csv"));
-            
+
         }
         private static void ListValidationOperations(ISharePointListValidationService spListValidationService)
         {
-            
+
             logger.Log(LogLevel.Info, $"Checking for missing lists");
             var missingLists = spListValidationService.MissingLists();
             if (missingLists.Count > 0)
@@ -211,7 +212,12 @@ namespace SiteValidation
             if (missingFields.Count > 0)
                 CsvWriterHelper.WriteCsvRecords(missingFields, Path.Combine(dirInfo.FullName, "missingFields.csv"));
 
-            
+            logger.Log(LogLevel.Info, $"Checking for missing list views");
+            var missingListViews = spListValidationService.MissingListViews();
+            if (missingListViews.Count > 0)
+                CsvWriterHelper.WriteCsvRecords(missingListViews, Path.Combine(dirInfo.FullName, "missingListViews.csv"));
+
+
             logger.Log(LogLevel.Info, $"Checking for missing list items");
             var missingListItems = spListValidationService.MissingListItems();
             if (missingListItems.Count > 0)

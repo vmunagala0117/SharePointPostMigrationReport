@@ -11,6 +11,7 @@ namespace Common.Interfaces
         List<string> MissingLists();
         List<SPListItemCount> GetListsItemsCountMismatch();
         List<SPField> MissingListColumns();
+        List<SPListView> MissingListViews();
         List<SPListItem> MissingListItems();
         List<SPWebPart> MissingWebParts();
     }

@@ -54,8 +54,8 @@ namespace SiteValidation
                     var targetSiteUrl = ConfigurationManager.AppSettings["TargetSiteHost"] + sRelativeUrl;
 
                     //initialize source connection object
-                    var srcSPCredObject = new SPConnection(ConfigurationManager.AppSettings["SourceSiteType"], sourceSiteUrl, ConfigurationManager.AppSettings["SourceUserName"], ConfigurationManager.AppSettings["SourcePassword"]);
-                    var tgtSPCredObject = new SPConnection(ConfigurationManager.AppSettings["TargetSiteType"], targetSiteUrl, ConfigurationManager.AppSettings["TargetUserName"], ConfigurationManager.AppSettings["TargetPassword"]);
+                    var srcSPCredObject = new SPConnection(ConfigurationManager.AppSettings["SourceSiteType"], sourceSiteUrl, sRelativeUrl, ConfigurationManager.AppSettings["SourceUserName"], ConfigurationManager.AppSettings["SourcePassword"]);
+                    var tgtSPCredObject = new SPConnection(ConfigurationManager.AppSettings["TargetSiteType"], targetSiteUrl, sRelativeUrl, ConfigurationManager.AppSettings["TargetUserName"], ConfigurationManager.AppSettings["TargetPassword"]);
 
                     var spWebValidationService = container.Resolve<ISharePointWebValidationService>(
                         new ParameterOverrides
@@ -122,8 +122,8 @@ namespace SiteValidation
                         targetSiteUrl = ConfigurationManager.AppSettings["TargetSiteHost"] + "/" + relativeUri.ToString();
 
                         //initialize source connection object
-                        srcSPCredObject = new SPConnection(ConfigurationManager.AppSettings["SourceSiteType"], webUrl, ConfigurationManager.AppSettings["SourceUserName"], ConfigurationManager.AppSettings["SourcePassword"]);
-                        tgtSPCredObject = new SPConnection(ConfigurationManager.AppSettings["TargetSiteType"], targetSiteUrl, ConfigurationManager.AppSettings["TargetUserName"], ConfigurationManager.AppSettings["TargetPassword"]);
+                        srcSPCredObject = new SPConnection(ConfigurationManager.AppSettings["SourceSiteType"], webUrl, relativeUri.ToString(), ConfigurationManager.AppSettings["SourceUserName"], ConfigurationManager.AppSettings["SourcePassword"]);
+                        tgtSPCredObject = new SPConnection(ConfigurationManager.AppSettings["TargetSiteType"], targetSiteUrl, relativeUri.ToString(), ConfigurationManager.AppSettings["TargetUserName"], ConfigurationManager.AppSettings["TargetPassword"]);
 
                         spWebValidationService = container.Resolve<ISharePointWebValidationService>(
                         new ParameterOverrides

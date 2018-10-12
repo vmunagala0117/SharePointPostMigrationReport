@@ -49,15 +49,19 @@ namespace Controller
             this.SourceSiteCreds = sourceCreds;
             this.TargetSiteCreds = targetCreds;
 
-            if (sourceCreds.SiteType != SiteType.WSS)
-                this.SourceClientContext = this.SharePointRepository.GetSPOContext(SourceSiteCreds.SiteUrl, SourceSiteCreds.UserName, SourceSiteCreds.Password);
-            else
+            if (sourceCreds.SiteType == SiteType.WSS)
                 this.SourceWSSContext = this.SharePointRepository2007.GetSPContext(SourceSiteCreds.SiteUrl, SourceSiteCreds.UserName, SourceSiteCreds.Password);
-
-            if (targetCreds.SiteType != SiteType.WSS)
-                this.TargetClientContext = this.SharePointRepository.GetSPOContext(TargetSiteCreds.SiteUrl, TargetSiteCreds.UserName, TargetSiteCreds.Password);
+            else if (sourceCreds.SiteType == SiteType.SharePointOnPremises)
+                this.SourceClientContext = this.SharePointRepository.GetSP2013Context(SourceSiteCreds.SiteUrl, SourceSiteCreds.UserName, SourceSiteCreds.Password, SourceSiteCreds.Domain);
             else
+                this.SourceClientContext = this.SharePointRepository.GetSPOContext(SourceSiteCreds.SiteUrl, SourceSiteCreds.UserName, SourceSiteCreds.Password);
+
+            if (targetCreds.SiteType == SiteType.WSS)
                 this.TargetWSSContext = this.SharePointRepository2007.GetSPContext(TargetSiteCreds.SiteUrl, TargetSiteCreds.UserName, TargetSiteCreds.Password);
+            else if (targetCreds.SiteType == SiteType.SharePointOnPremises)
+                this.TargetClientContext = this.SharePointRepository.GetSP2013Context(TargetSiteCreds.SiteUrl, TargetSiteCreds.UserName, TargetSiteCreds.Password, TargetSiteCreds.Domain);
+            else
+                this.TargetClientContext = this.SharePointRepository.GetSPOContext(TargetSiteCreds.SiteUrl, TargetSiteCreds.UserName, TargetSiteCreds.Password);
 
             this.UserMapping = userMapping;
             this.logger = logger;
@@ -183,13 +187,13 @@ namespace Controller
                     usersGroups = this.SharePointRepository2007.GetWebUserGroups();
                 else
                     usersGroups = this.SharePointRepository.GetWebUserGroups(SourceClientContext);
-                
+
                 foreach (var userGroup in usersGroups)
                 {
                     foreach (var user in userGroup.Value)
                     {
                         string newUpn = user;
-                        if (UserMapping != null)
+                        if (UserMapping != null && UserMapping.GetUserMappingList().Count > 0)
                             newUpn = UserMapping.FindNewUpn(user);
 
                         if (newUpn == string.Empty)
@@ -261,11 +265,18 @@ namespace Controller
             {
                 //Get target host URI
                 Uri targetUri = new Uri(TargetSiteCreds.SiteUrl);
-                string targetHost = targetUri.GetLeftPart(UriPartial.Authority);
+                //string targetHost = targetUri.GetLeftPart(UriPartial.Authority);
+                string targetHost = TargetSiteCreds.SiteUrl;
+                if (!String.IsNullOrEmpty(TargetSiteCreds.WebRelativeUrl))
+                    targetHost = targetHost.Replace(TargetSiteCreds.WebRelativeUrl, "");
 
                 //Get source host URI
                 Uri sourceUri = new Uri(SourceSiteCreds.SiteUrl);
-                string sourceHost = sourceUri.GetLeftPart(UriPartial.Authority).ToString();
+                //string sourceHost = sourceUri.GetLeftPart(UriPartial.Authority).ToString();
+                string sourceHost = SourceSiteCreds.SiteUrl;
+                if (!String.IsNullOrEmpty(SourceSiteCreds.WebRelativeUrl))
+                    sourceHost = sourceHost.Replace(SourceSiteCreds.WebRelativeUrl, "");
+
                 Uri sourceHostUri = new Uri(sourceHost);
 
                 //Get all webs from the source
@@ -280,6 +291,7 @@ namespace Controller
                     var webUri = new Uri(web, true);
                     var relativeUri = sourceHostUri.MakeRelativeUri(webUri);
 
+                    //var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + "/" + relativeUri.ToString());
                     var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + "/" + relativeUri.ToString());
                     if (!webExists)
                     {

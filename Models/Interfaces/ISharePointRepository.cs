@@ -11,6 +11,7 @@ namespace Common.Interfaces
     public interface ISharePointRepository
     {
         ClientContext GetSPOContext(string siteUrl, string tenantUser, string tenantUserPassword);
+        ClientContext GetSP2013Context(string siteUrl, string userName, string passWord, string domain);
         IEnumerable<string> GetAllWebUrls(ClientContext cc);
         bool WebExists(ClientContext cc, string url);
         List<string> GetWebGroups(ClientContext cc);
@@ -27,6 +28,8 @@ namespace Common.Interfaces
         IEnumerable<string> GetLists(ClientContext cc);
         int GetListItemCount(ClientContext cc, string listName);
         bool ListExists(ClientContext cc, string listName);
+        List<string> GetListViews(ClientContext cc, string listName);
+        bool CheckIfListViewExists(ClientContext cc, string listName, string viewName);
         IEnumerable<string> GetListContentTypes(ClientContext cc, string listName);
         bool CheckIfContentTypeExists(ClientContext cc, string listName, string contentTypeName);
         IEnumerable<string> GetListColumns(ClientContext cc, string listName);

@@ -19,10 +19,12 @@ namespace Common
     {
         public SPListItemClassMap()
         {
+            Map(m => m.ID).Name("ID");
             Map(m => m.Title).Name("Title");
+            Map(m => m.Name).Name("Name");
             Map(m => m.FileDirRef).Name("FileDirRef");
             Map(m => m.FileRef).Name("FileRef");
-            Map(m => m.FileRef).Name("ModifiedDate");
+            Map(m => m.ModifiedDate).Name("ModifiedDate");
         }
     }
     public sealed class SPListItemCountClassMap : ClassMap<SPListItemCount>
@@ -32,6 +34,14 @@ namespace Common
             Map(m => m.ListName).Name("ListName");
             Map(m => m.CurrentValue).Name("CurrentValue");
             Map(m => m.ExpectedValue).Name("ExpectedValue");
+        }
+    }
+    public sealed class SPListViewClassMap : ClassMap<SPListView>
+    {
+        public SPListViewClassMap()
+        {
+            Map(m => m.ListName).Name("ListName");
+            Map(m => m.ViewName).Name("ViewName");
         }
     }
     public sealed class SPWebPartClassMap : ClassMap<SPWebPart>
