@@ -113,11 +113,12 @@ namespace SiteValidation
                                 continue;
                         }
 
-                        Uri sourceHostUri = new Uri(ConfigurationManager.AppSettings["SourceSiteHost"]);
-                        var webUri = new Uri(webUrl, true);
-                        var relativeUri = sourceHostUri.MakeRelativeUri(webUri);
+                        //Uri sourceHostUri = new Uri(ConfigurationManager.AppSettings["SourceSiteHost"]);
+                        //var webUri = new Uri(webUrl, true);
 
-                        dirInfo = Directory.CreateDirectory(Path.Combine(targetFilePath, relativeUri.ToString()));
+                        var relativeUri = webUrl.Replace(ConfigurationManager.AppSettings["SourceSiteHost"], "");
+
+                        dirInfo = Directory.CreateDirectory(Path.Combine(targetFilePath, relativeUri));
 
                         if (webUrl == sourceSiteUrl)
                         {

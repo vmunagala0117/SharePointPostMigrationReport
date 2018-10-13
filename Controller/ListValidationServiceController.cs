@@ -259,6 +259,17 @@ namespace Controller
         public List<SPListItem> MissingListItems()
         {
             var results = new List<SPListItem>();
+
+            string targetHost = new Uri(this.TargetSiteCreds.SiteUrl).GetLeftPart(UriPartial.Authority);
+            string targetRootSiteRelativeUrl = this.TargetSiteCreds.SiteUrl.Replace(targetHost, "");
+            //if (!String.IsNullOrEmpty(this.TargetSiteCreds.WebRelativeUrl))
+            // targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Replace(this.TargetSiteCreds.WebRelativeUrl, "");
+
+            if (targetRootSiteRelativeUrl.EndsWith("/"))
+                targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Substring(0, targetRootSiteRelativeUrl.Length - 1);
+
+            string sourceHost = new Uri(this.SourceSiteCreds.SiteUrl).GetLeftPart(UriPartial.Authority);
+            string sourceRootSiteRelativeUrl = this.SourceSiteCreds.SiteUrl.Replace(sourceHost, "");
             foreach (var list in this.GetExistingLists)
             {
                 try
@@ -278,27 +289,28 @@ namespace Controller
                         listItems = this.SharePointRepository.GetListItems(SourceClientContext, list);
                     }
 
-                    string targetHost = new Uri(this.TargetSiteCreds.SiteUrl).GetLeftPart(UriPartial.Authority);
-                    string targetRootSiteRelativeUrl = this.TargetSiteCreds.SiteUrl.Replace(targetHost, "");
-                    if (!String.IsNullOrEmpty(this.TargetSiteCreds.WebRelativeUrl))
-                        targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Replace(this.TargetSiteCreds.WebRelativeUrl, "");
-
-                    if (targetRootSiteRelativeUrl.EndsWith("/"))
-                        targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Substring(0, targetRootSiteRelativeUrl.Length - 1);
-
                     foreach (var listItem in listItems)
                     {
+                        if (!listItem.FileDirRef.StartsWith("/"))
+                            listItem.FileDirRef = "/" + listItem.FileDirRef;
+                        if (!listItem.FileRef.StartsWith("/"))
+                            listItem.FileRef = "/" + listItem.FileRef;
+
                         //check if the listItem is starting with current web's relative URL?
                         if (!listItem.FileDirRef.StartsWith(targetRootSiteRelativeUrl) && !listItem.FileRef.StartsWith(targetRootSiteRelativeUrl))
                         {
-                            if (listItem.FileDirRef.StartsWith("/"))
-                                listItem.FileDirRef = listItem.FileDirRef.Substring(1);
 
-                            if (listItem.FileRef.StartsWith("/"))
-                                listItem.FileRef = listItem.FileRef.Substring(1);
+                            if (String.IsNullOrEmpty(sourceRootSiteRelativeUrl))
+                                listItem.FileDirRef = targetRootSiteRelativeUrl + listItem.FileDirRef;
+                            
+                            if (!String.IsNullOrEmpty(sourceRootSiteRelativeUrl) && listItem.FileDirRef.StartsWith(sourceRootSiteRelativeUrl))
+                                listItem.FileDirRef = targetRootSiteRelativeUrl + listItem.FileDirRef.Replace(sourceRootSiteRelativeUrl, "");
 
-                            listItem.FileDirRef = targetRootSiteRelativeUrl + "/" + listItem.FileDirRef;
-                            listItem.FileRef = targetRootSiteRelativeUrl + "/" + listItem.FileRef;
+                            if (String.IsNullOrEmpty(sourceRootSiteRelativeUrl))
+                                listItem.FileRef = targetRootSiteRelativeUrl + listItem.FileRef;
+
+                            if (!String.IsNullOrEmpty(sourceRootSiteRelativeUrl) && listItem.FileRef.StartsWith(sourceRootSiteRelativeUrl))
+                                listItem.FileRef = targetRootSiteRelativeUrl + listItem.FileRef.Replace(sourceRootSiteRelativeUrl, "");
                         }
 
                         if (!this.SharePointRepository.GetListItemExists(TargetClientContext, list, listItem))
@@ -431,7 +443,7 @@ namespace Controller
                     {
                         if (!webPart.FileRelativeUrl.StartsWith(targetRootSiteRelativeUrl))
                         {
-                            
+
                             if (webPart.FileRelativeUrl.StartsWith("/"))
                                 webPart.FileRelativeUrl = webPart.FileRelativeUrl.Substring(1);
 

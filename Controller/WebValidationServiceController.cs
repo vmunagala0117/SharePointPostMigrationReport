@@ -287,12 +287,9 @@ namespace Controller
                     webs = this.SharePointRepository.GetAllWebUrls(SourceClientContext);
 
                 foreach (var web in webs)
-                {
-                    var webUri = new Uri(web, true);
-                    var relativeUri = sourceHostUri.MakeRelativeUri(webUri);
-
+                {                    
                     //var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + "/" + relativeUri.ToString());
-                    var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + "/" + relativeUri.ToString());
+                    var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + web.Replace(sourceHost, ""));
                     if (!webExists)
                     {
                         missingSites.Add(web);
