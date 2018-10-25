@@ -368,7 +368,8 @@ namespace DataAccess
         }
         #endregion
 
-        #region List Operations
+        #region List Operations       
+
         public IEnumerable<string> GetLists(ClientContext cc)
         {
             try
@@ -408,6 +409,21 @@ namespace DataAccess
                 throw ex;
             }
         }
+
+        public int GetListBaseTemplate(ClientContext cc, string listName)
+        {
+            try
+            {
+                var list = cc.Web.GetListByTitle(listName);
+                return list.BaseTemplate;
+            }
+            catch (Exception ex)
+            {
+                logger.Log(LogLevel.Error, ex, $"Site:{cc.Url};List:{listName}");
+                throw ex;
+            }
+        }
+
         public int GetListItemCount(ClientContext cc, string listName)
         {
             try
@@ -518,14 +534,23 @@ namespace DataAccess
                 {
                     CamlQuery camlQuery = new CamlQuery();
                     camlQuery.ListItemCollectionPosition = itemPosition;
-                    camlQuery.ViewXml = @"<View Scope='RecursiveAll'><RowLimit>500</RowLimit></View>";
+
+                    /*
+                   var viewFields = "<ViewFields><FieldRef Name='EncodedAbsUrl' /> " +
+                              "<FieldRef Name = 'Author' />" +
+                              "<FieldRef Name='Editor' /> <FieldRef Name = 'Created' />" +
+                              "<FieldRef Name='Modified' /> <FieldRef Name = 'ID' /> <FieldRef Name = 'Title' /> <FieldRef Name = 'Name' />" +
+                              "<FieldRef Name='FileRef' /> <FieldRef Name = 'FileDirRef' /></ViewFields>";
+
+                    camlQuery.ViewXml = $"<View Scope='RecursiveAll'>{viewFields}<RowLimit>500</RowLimit></View>";*/
+
+                    camlQuery.ViewXml = "<View Scope='RecursiveAll'><RowLimit>500</RowLimit></View>";
 
                     ListItemCollection listItems = list.GetItems(camlQuery);
                     cc.Load(listItems);
                     cc.ExecuteQuery();
 
-                    itemPosition = listItems.ListItemCollectionPosition;
-
+                    itemPosition = listItems.ListItemCollectionPosition;                   
 
                     foreach (ListItem listItem in listItems)
                     {
@@ -536,7 +561,9 @@ namespace DataAccess
                             FileDirRef = listItem["FileDirRef"].ToString(),
                             //FileType = (listItem["File_x0020_Type"] == null) ? string.Empty : listItem["File_x0020_Type"].ToString(),                            
                             ID = listItem["ID"].ToString(),
-                            ModifiedDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.Parse(listItem["Modified"].ToString()), timeZoneInfo)
+                            ModifiedDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.Parse(listItem["Modified"].ToString()), timeZoneInfo),
+                            ListServerTemplate = list.BaseTemplate
+                            //Name = name
                         });
                     }
                     if (itemPosition == null)

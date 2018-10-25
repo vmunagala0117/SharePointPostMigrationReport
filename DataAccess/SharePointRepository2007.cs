@@ -114,6 +114,7 @@ namespace DataAccess
                 var timeZone = regionalSettingsElement.Elements().Where(e => e.Name.LocalName == "TimeZone").Single().Value;
                 var utcOffset = new TimeSpan(0, int.Parse(timeZone), 0);
                 var timeZoneInfo = TimeZoneInfo.GetSystemTimeZones().Where(t => t.BaseUtcOffset.Equals(utcOffset)).First();
+                var listServerTemplate = int.Parse(xn.Attributes["ServerTemplate"].Value);
 
                 //XML Document object
                 XmlDocument xmlDoc = new System.Xml.XmlDocument();
@@ -154,7 +155,8 @@ namespace DataAccess
                                             ModifiedDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.Parse(objReader["ows_Modified"].ToString()), timeZoneInfo),
                                             Title = objReader["ows_Title"],
                                             Name = objReader["ows_Name"],
-                                            EncodedAbsUrl = objReader["ows_EncodedAbsUrl"]
+                                            EncodedAbsUrl = Uri.UnescapeDataString(objReader["ows_EncodedAbsUrl"]),
+                                            ListServerTemplate = listServerTemplate 
                                         });
                                     }
                                 }

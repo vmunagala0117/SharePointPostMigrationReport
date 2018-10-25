@@ -15,6 +15,16 @@ namespace Common
         public string FileRef { get; set; }
         public DateTime ModifiedDate { get; set; }
         public string EncodedAbsUrl { get; set; }
-        //public string FileType { get; set; }
+        public int ListServerTemplate { get; set; }
+        //public string FileType { get; set; }          
+
+
+        public int GetListItemHashCode()
+        {
+            if (this.ListServerTemplate != 101 && !String.IsNullOrEmpty(this.Title))
+                return (this.FileDirRef + this.Title).GetHashCode();
+            else
+                return (this.FileDirRef + this.FileRef).GetHashCode();            
+        }
     }
 }

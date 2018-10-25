@@ -244,7 +244,7 @@ namespace Controller
             return results;
         }
 
-        #region TEST
+        #region FOR TESTING PURPOSE ONLY
         private void GetListItemsInventory(string list)
         {
             List<SPListItem> listItems = this.SharePointRepository2007.GetListItems(list);
@@ -274,10 +274,10 @@ namespace Controller
             {
                 try
                 {
-                    #region Test - REMOVE
+                    ////FOR TESTING PURPOSE ONLY
                     /*if (list == "Documents")
                         GetListItemsInventory(list);*/
-                    #endregion
+
 
                     IEnumerable<SPListItem> listItems = null;
                     if (SourceSiteCreds.SiteType == SiteType.WSS)
@@ -302,7 +302,7 @@ namespace Controller
 
                             if (String.IsNullOrEmpty(sourceRootSiteRelativeUrl))
                                 listItem.FileDirRef = targetRootSiteRelativeUrl + listItem.FileDirRef;
-                            
+
                             if (!String.IsNullOrEmpty(sourceRootSiteRelativeUrl) && listItem.FileDirRef.StartsWith(sourceRootSiteRelativeUrl))
                                 listItem.FileDirRef = targetRootSiteRelativeUrl + listItem.FileDirRef.Replace(sourceRootSiteRelativeUrl, "");
 
@@ -334,36 +334,79 @@ namespace Controller
             return results;
         }
 
-        //Missing List Items based on modified date -- for missing items without modified see above module.
-        public List<SPListItem> MissingListItems2()
+        //Improvement
+        public List<SPListItem> MissingListItemsV1()
         {
             var results = new List<SPListItem>();
+
+            string targetHost = new Uri(this.TargetSiteCreds.SiteUrl).GetLeftPart(UriPartial.Authority);
+            string targetRootSiteRelativeUrl = this.TargetSiteCreds.SiteUrl.Replace(targetHost, "");
+            //if (!String.IsNullOrEmpty(this.TargetSiteCreds.WebRelativeUrl))
+            // targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Replace(this.TargetSiteCreds.WebRelativeUrl, "");
+
+            if (targetRootSiteRelativeUrl.EndsWith("/"))
+                targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Substring(0, targetRootSiteRelativeUrl.Length - 1);
+
+            string sourceHost = new Uri(this.SourceSiteCreds.SiteUrl).GetLeftPart(UriPartial.Authority);
+            string sourceRootSiteRelativeUrl = this.SourceSiteCreds.SiteUrl.Replace(sourceHost, "");
             foreach (var list in this.GetExistingLists)
             {
                 try
                 {
-                    IEnumerable<SPListItem> listItems = null;
+                    //get source list items
+                    IEnumerable<SPListItem> sourceListItems = null;
                     if (SourceSiteCreds.SiteType == SiteType.WSS)
                     {
-                        this.SharePointRepository2007.GetListItems(list);
+                        sourceListItems = this.SharePointRepository2007.GetListItems(list);
                     }
                     else
                     {
-                        listItems = this.SharePointRepository.GetListItems(SourceClientContext, list);
+                        sourceListItems = this.SharePointRepository.GetListItems(SourceClientContext, list);
+                    }                  
+
+                    //get target list items
+                    List<SPListItem> targetListItems = this.SharePointRepository.GetListItems(TargetClientContext, list);
+                    
+                    //key is hashcode, while value is the actual list item
+                    Dictionary<int, SPListItem> hashedListItems = new Dictionary<int, SPListItem>();
+
+                    //go retrieve all target list items and add it to the dictionary
+                    foreach (var listItem in targetListItems)
+                    {
+                        hashedListItems.Add(listItem.GetListItemHashCode(), listItem);
                     }
 
-                    foreach (var listItem in listItems)
+                    //get all list items, transform it and then compare key.
+                    foreach (var listItem in sourceListItems)
                     {
-                        if (!this.SharePointRepository.GetListItemExistsByModifiedDate(TargetClientContext, list, listItem))
+                        //string manipulation - convert source list items to its target list equivalent items and store it in a temp object
+                        SPListItem transformSourceListItem = new SPListItem();
+                        transformSourceListItem = listItem;
+
+                        if (!transformSourceListItem.FileDirRef.StartsWith("/"))
+                            transformSourceListItem.FileDirRef = "/" + transformSourceListItem.FileDirRef;
+                        if (!transformSourceListItem.FileRef.StartsWith("/"))
+                            transformSourceListItem.FileRef = "/" + transformSourceListItem.FileRef;
+
+                        //check if the listItem is starting with current web's relative URL?
+                        if (!transformSourceListItem.FileDirRef.StartsWith(targetRootSiteRelativeUrl) && !transformSourceListItem.FileRef.StartsWith(targetRootSiteRelativeUrl))
                         {
-                            logger.Log(LogLevel.Info, $"Missing ListItem:{listItem.FileRef};List:{list}");
-                            results.Add(listItem);
+                            if (String.IsNullOrEmpty(sourceRootSiteRelativeUrl))
+                                transformSourceListItem.FileDirRef = targetRootSiteRelativeUrl + transformSourceListItem.FileDirRef;
+
+                            if (!String.IsNullOrEmpty(sourceRootSiteRelativeUrl) && transformSourceListItem.FileDirRef.StartsWith(sourceRootSiteRelativeUrl))
+                                transformSourceListItem.FileDirRef = targetRootSiteRelativeUrl + transformSourceListItem.FileDirRef.Replace(sourceRootSiteRelativeUrl, "");
+
+                            if (String.IsNullOrEmpty(sourceRootSiteRelativeUrl))
+                                transformSourceListItem.FileRef = targetRootSiteRelativeUrl + transformSourceListItem.FileRef;
+
+                            if (!String.IsNullOrEmpty(sourceRootSiteRelativeUrl) && transformSourceListItem.FileRef.StartsWith(sourceRootSiteRelativeUrl))
+                                transformSourceListItem.FileRef = targetRootSiteRelativeUrl + transformSourceListItem.FileRef.Replace(sourceRootSiteRelativeUrl, "");
                         }
-                        else
+                        //HashSet comparision - faster than List<> -- comparision based on the hashcode
+                        if (!hashedListItems.ContainsKey(transformSourceListItem.GetListItemHashCode()))
                         {
-                            //Check if files were changed based on modified date
-                            //if (!this.SharePointRepository.GetListItemExistsByModifiedDate(TargetClientContext, list, listItem))
-                            //    results.Add(listItem);
+                            results.Add(listItem);
                         }
                     }
                 }

@@ -13,6 +13,7 @@ namespace Common.Interfaces
         List<SPField> MissingListColumns();
         List<SPListView> MissingListViews();
         List<SPListItem> MissingListItems();
+        List<SPListItem> MissingListItemsV1();
         List<SPWebPart> MissingWebParts();
     }
 }

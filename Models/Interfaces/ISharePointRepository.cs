@@ -26,6 +26,7 @@ namespace Common.Interfaces
         IDictionary<string, UserPermissions> GetWebUserPermissions(ClientContext cc);
         UserPermissions CheckUserPermissions(ClientContext cc, string userLoginName);
         IEnumerable<string> GetLists(ClientContext cc);
+        int GetListBaseTemplate(ClientContext cc, string listName);
         int GetListItemCount(ClientContext cc, string listName);
         bool ListExists(ClientContext cc, string listName);
         List<string> GetListViews(ClientContext cc, string listName);

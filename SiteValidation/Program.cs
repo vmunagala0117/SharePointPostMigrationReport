@@ -113,13 +113,6 @@ namespace SiteValidation
                                 continue;
                         }
 
-                        //Uri sourceHostUri = new Uri(ConfigurationManager.AppSettings["SourceSiteHost"]);
-                        //var webUri = new Uri(webUrl, true);
-
-                        var relativeUri = webUrl.Replace(ConfigurationManager.AppSettings["SourceSiteHost"], "");
-
-                        dirInfo = Directory.CreateDirectory(Path.Combine(targetFilePath, relativeUri));
-
                         if (webUrl == sourceSiteUrl)
                         {
                             WebValidationOperations(spWebValidationService);
@@ -127,11 +120,17 @@ namespace SiteValidation
                             continue;
                         }
 
-                        targetSiteUrl = ConfigurationManager.AppSettings["TargetSiteHost"] + "/" + relativeUri.ToString();
+                        // relative URL --> the very last part
+                        var relativeUrl = webUrl.Replace(sourceSiteUrl, "");
+
+                        targetSiteUrl = ConfigurationManager.AppSettings["TargetSiteHost"]  + sRelativeUrl + relativeUrl;
+
+                        targetFilePath = Path.Combine(ConfigurationManager.AppSettings["LogDirectory"], (targetSiteUrl.Contains("https://") ? targetSiteUrl.Replace("https://", "") : targetSiteUrl.Replace("http://", "")));
+                        dirInfo = Directory.CreateDirectory(targetFilePath);
 
                         //initialize source connection object
-                        srcSPCredObject = new SPConnection(ConfigurationManager.AppSettings["SourceSiteType"], webUrl, relativeUri.ToString(), ConfigurationManager.AppSettings["SourceUserName"], ConfigurationManager.AppSettings["SourcePassword"]);
-                        tgtSPCredObject = new SPConnection(ConfigurationManager.AppSettings["TargetSiteType"], targetSiteUrl, relativeUri.ToString(), ConfigurationManager.AppSettings["TargetUserName"], ConfigurationManager.AppSettings["TargetPassword"]);
+                        srcSPCredObject = new SPConnection(ConfigurationManager.AppSettings["SourceSiteType"], webUrl, relativeUrl, ConfigurationManager.AppSettings["SourceUserName"], ConfigurationManager.AppSettings["SourcePassword"]);
+                        tgtSPCredObject = new SPConnection(ConfigurationManager.AppSettings["TargetSiteType"], targetSiteUrl, relativeUrl, ConfigurationManager.AppSettings["TargetUserName"], ConfigurationManager.AppSettings["TargetPassword"]);
 
 
                         logger.Log(LogLevel.Info, $"Validating Sites and Lists for {targetSiteUrl}");
@@ -220,7 +219,7 @@ namespace SiteValidation
 
 
             logger.Log(LogLevel.Info, $"Checking for missing list items");
-            var missingListItems = spListValidationService.MissingListItems();
+            var missingListItems = spListValidationService.MissingListItemsV1();
             if (missingListItems.Count > 0)
                 CsvWriterHelper.WriteCsvRecords(missingListItems, Path.Combine(dirInfo.FullName, "missingListItems.csv"));
 
