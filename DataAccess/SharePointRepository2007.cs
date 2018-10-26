@@ -114,7 +114,7 @@ namespace DataAccess
                 var timeZone = regionalSettingsElement.Elements().Where(e => e.Name.LocalName == "TimeZone").Single().Value;
                 var utcOffset = new TimeSpan(0, int.Parse(timeZone), 0);
                 var timeZoneInfo = TimeZoneInfo.GetSystemTimeZones().Where(t => t.BaseUtcOffset.Equals(utcOffset)).First();
-                var listServerTemplate = int.Parse(xn.Attributes["ServerTemplate"].Value);
+                var listBaseType = int.Parse(xn.Attributes["BaseType"].Value);
 
                 //XML Document object
                 XmlDocument xmlDoc = new System.Xml.XmlDocument();
@@ -149,14 +149,14 @@ namespace DataAccess
                                     {
                                         results.Add(new SPListItem()
                                         {
-                                            FileDirRef = objReader["ows_FileDirRef"].ToString().Contains(";#") ? objReader["ows_FileDirRef"].ToString().Split(new string[] { ";#" }, StringSplitOptions.None)[1] : objReader["ows_FileDirRef"].ToString(),
-                                            FileRef = objReader["ows_FileRef"].ToString().Contains(";#") ? objReader["ows_FileRef"].ToString().Split(new string[] { ";#" }, StringSplitOptions.None)[1] : objReader["ows_FileRef"].ToString(),
+                                            FileDirRef = objReader["ows_FileDirRef"].ToString().Contains(";#") ? objReader["ows_FileDirRef"].ToString().ToLower().Split(new string[] { ";#" }, StringSplitOptions.None)[1] : objReader["ows_FileDirRef"].ToString().ToLower(),
+                                            FileRef = objReader["ows_FileRef"].ToString().Contains(";#") ? objReader["ows_FileRef"].ToString().ToLower().Split(new string[] { ";#" }, StringSplitOptions.None)[1] : objReader["ows_FileRef"].ToString().ToLower(),
                                             ID = objReader["ows_ID"],
                                             ModifiedDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.Parse(objReader["ows_Modified"].ToString()), timeZoneInfo),
                                             Title = objReader["ows_Title"],
                                             Name = objReader["ows_Name"],
                                             EncodedAbsUrl = Uri.UnescapeDataString(objReader["ows_EncodedAbsUrl"]),
-                                            ListServerTemplate = listServerTemplate 
+                                            ListBaseType = listBaseType
                                         });
                                     }
                                 }
@@ -323,7 +323,7 @@ namespace DataAccess
                 //XmlNode xn = SPContext.WSSWebs.GetWebCollection();
                 var elements = xn.GetChildElements();
                 var currentWebUrl = SPContext.WSSWebs.Url.Replace("/_vti_bin/Webs.asmx", "");
-                var webs = elements.Where(e => e.Attribute("Url").Value.StartsWith(currentWebUrl)).Select(e => e.Attribute("Url").Value);
+                var webs = elements.Where(e => e.Attribute("Url").Value.StartsWith(currentWebUrl, StringComparison.CurrentCultureIgnoreCase)).Select(e => e.Attribute("Url").Value);
                 return webs;
             }
             catch (FaultException fe)

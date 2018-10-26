@@ -289,7 +289,7 @@ namespace Controller
                 foreach (var web in webs)
                 {                    
                     //var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + "/" + relativeUri.ToString());
-                    var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + web.Replace(sourceHost, ""));
+                    var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + web.ToLower().Replace(sourceHost.ToLower(), ""));
                     if (!webExists)
                     {
                         missingSites.Add(web);

@@ -96,7 +96,7 @@ namespace SiteValidation
                     var webUrls = spWebValidationService.GetAllSourceWebUrls();
                     if (webUrls.Count() == 1)
                     {
-                        if (webUrls.First() == sourceSiteUrl)
+                        if (webUrls.First().ToLower() == sourceSiteUrl.ToLower())
                         {
                             WebValidationOperations(spWebValidationService);
                             ListValidationOperations(spListValidationService);
@@ -108,12 +108,12 @@ namespace SiteValidation
 
                         if (missingSites.Count > 0)
                         {
-                            var match = missingSites.Exists(s => s == webUrl);
+                            var match = missingSites.Exists(s => s.ToLower() == webUrl.ToLower());
                             if (match)
                                 continue;
                         }
 
-                        if (webUrl == sourceSiteUrl)
+                        if (webUrl.ToLower() == sourceSiteUrl.ToLower())
                         {
                             WebValidationOperations(spWebValidationService);
                             ListValidationOperations(spListValidationService);
@@ -121,7 +121,7 @@ namespace SiteValidation
                         }
 
                         // relative URL --> the very last part
-                        var relativeUrl = webUrl.Replace(sourceSiteUrl, "");
+                        var relativeUrl = webUrl.ToLower().Replace(sourceSiteUrl.ToLower(), "");
 
                         targetSiteUrl = ConfigurationManager.AppSettings["TargetSiteHost"]  + sRelativeUrl + relativeUrl;
 

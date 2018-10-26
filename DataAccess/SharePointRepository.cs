@@ -557,12 +557,12 @@ namespace DataAccess
                         results.Add(new SPListItem()
                         {
                             Title = (!isDocLib) ? ((listItem["Title"] == null) ? string.Empty : listItem["Title"].ToString()) : string.Empty,
-                            FileRef = listItem["FileRef"].ToString(),
-                            FileDirRef = listItem["FileDirRef"].ToString(),
+                            FileRef = listItem["FileRef"].ToString().ToLower(),
+                            FileDirRef = listItem["FileDirRef"].ToString().ToLower(),
                             //FileType = (listItem["File_x0020_Type"] == null) ? string.Empty : listItem["File_x0020_Type"].ToString(),                            
                             ID = listItem["ID"].ToString(),
                             ModifiedDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.Parse(listItem["Modified"].ToString()), timeZoneInfo),
-                            ListServerTemplate = list.BaseTemplate
+                            ListBaseType = (int)Enum.Parse(typeof(BaseType), list.BaseType.ToString())
                             //Name = name
                         });
                     }

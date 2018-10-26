@@ -339,16 +339,16 @@ namespace Controller
         {
             var results = new List<SPListItem>();
 
-            string targetHost = new Uri(this.TargetSiteCreds.SiteUrl).GetLeftPart(UriPartial.Authority);
-            string targetRootSiteRelativeUrl = this.TargetSiteCreds.SiteUrl.Replace(targetHost, "");
+            string targetHost = new Uri(this.TargetSiteCreds.SiteUrl.ToLower()).GetLeftPart(UriPartial.Authority);
+            string targetRootSiteRelativeUrl = this.TargetSiteCreds.SiteUrl.ToLower().Replace(targetHost, "");
             //if (!String.IsNullOrEmpty(this.TargetSiteCreds.WebRelativeUrl))
             // targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Replace(this.TargetSiteCreds.WebRelativeUrl, "");
 
             if (targetRootSiteRelativeUrl.EndsWith("/"))
-                targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.Substring(0, targetRootSiteRelativeUrl.Length - 1);
+                targetRootSiteRelativeUrl = targetRootSiteRelativeUrl.ToLower().Substring(0, targetRootSiteRelativeUrl.Length - 1);
 
-            string sourceHost = new Uri(this.SourceSiteCreds.SiteUrl).GetLeftPart(UriPartial.Authority);
-            string sourceRootSiteRelativeUrl = this.SourceSiteCreds.SiteUrl.Replace(sourceHost, "");
+            string sourceHost = new Uri(this.SourceSiteCreds.SiteUrl.ToLower()).GetLeftPart(UriPartial.Authority);
+            string sourceRootSiteRelativeUrl = this.SourceSiteCreds.SiteUrl.ToLower().Replace(sourceHost, "");
             foreach (var list in this.GetExistingLists)
             {
                 try
@@ -370,18 +370,47 @@ namespace Controller
                     //key is hashcode, while value is the actual list item
                     Dictionary<int, SPListItem> hashedListItems = new Dictionary<int, SPListItem>();
 
+                    bool useDefaultHashCode = false;
                     //go retrieve all target list items and add it to the dictionary
-                    foreach (var listItem in targetListItems)
+                    try
                     {
-                        hashedListItems.Add(listItem.GetListItemHashCode(), listItem);
+                        foreach (var listItem in targetListItems)
+                        {
+                            hashedListItems.Add(listItem.GetListItemHashCode(), listItem);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ex.Message == "An item with the same key has already been added.")
+                        {
+                            //then we have a problem
+                            useDefaultHashCode = true;
+                            hashedListItems = new Dictionary<int, SPListItem>();
+                            foreach (var listItem in targetListItems)
+                            {
+                                hashedListItems.Add(listItem.GetListItemDefaultHashCode(), listItem);
+                            }
+                        }
+
                     }
 
                     //get all list items, transform it and then compare key.
                     foreach (var listItem in sourceListItems)
                     {
                         //string manipulation - convert source list items to its target list equivalent items and store it in a temp object
-                        SPListItem transformSourceListItem = new SPListItem();
-                        transformSourceListItem = listItem;
+                        SPListItem transformSourceListItem = new SPListItem()
+                        {
+                            FileDirRef = listItem.FileDirRef,
+                            FileRef = listItem.FileRef,
+                            ID = listItem.ID,
+                            Title = listItem.Title,
+                            ModifiedDate = listItem.ModifiedDate,
+                            ListBaseType = listItem.ListBaseType,
+                            EncodedAbsUrl = listItem.EncodedAbsUrl,
+                            Name = listItem.Name
+                        };
+
+                        //transformSourceListItem = listItem;
 
                         if (!transformSourceListItem.FileDirRef.StartsWith("/"))
                             transformSourceListItem.FileDirRef = "/" + transformSourceListItem.FileDirRef;
@@ -404,8 +433,10 @@ namespace Controller
                                 transformSourceListItem.FileRef = targetRootSiteRelativeUrl + transformSourceListItem.FileRef.Replace(sourceRootSiteRelativeUrl, "");
                         }
                         //HashSet comparision - faster than List<> -- comparision based on the hashcode
-                        if (!hashedListItems.ContainsKey(transformSourceListItem.GetListItemHashCode()))
+                        int targetKeyHashCode = (useDefaultHashCode) ? transformSourceListItem.GetListItemDefaultHashCode() : transformSourceListItem.GetListItemHashCode();
+                        if (!hashedListItems.ContainsKey(targetKeyHashCode))
                         {
+                            logger.Log(LogLevel.Info, $"Missing ListItem:{listItem.FileRef}");
                             results.Add(listItem);
                         }
                     }
