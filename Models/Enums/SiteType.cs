@@ -9,7 +9,7 @@ namespace Common.Enums
     public enum SiteType
     {
         SharePointOnline,
-        SharePointOnPremises,
-        WSS
+        SharePointOnPremises, //for SP 2010 and above
+        WSS //  for SP 2007 version or below
     }
 }
