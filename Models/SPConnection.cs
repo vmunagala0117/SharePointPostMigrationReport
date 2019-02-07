@@ -17,8 +17,13 @@ namespace Common
             this.UserName = uname.Contains("\\") ? uname.Split(new char[] { '\\' })[1] : uname;
             this.Password = password;
             this.Domain = uname.Contains("\\") ? uname.Split(new char[] { '\\' })[0] : "";
+
+            string siteHost = this.SiteHost = new Uri(siteUrl).GetLeftPart(UriPartial.Authority);
+            this.RootSiteRelativeUrl = siteUrl.ToLower().Replace(siteHost, "");
         }
         public string SiteUrl { get; set; }
+        public string SiteHost { get; set; }
+        public string RootSiteRelativeUrl { get; set; }
         public string WebRelativeUrl { get; set; }
         public string UserName { get; set; }
         public string Password { get; set; }

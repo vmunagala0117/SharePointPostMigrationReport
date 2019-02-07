@@ -94,7 +94,10 @@ namespace DataAccess
         {
             try
             {
-                return cc.Site.GetAllWebUrls();
+                cc.Load(cc.Web, c => c.Url);
+                cc.ExecuteQuery();
+                var webs = cc.Site.GetAllWebUrls().Where(e => e.StartsWith(cc.Web.Url, StringComparison.CurrentCultureIgnoreCase));
+                return webs;
             }
             catch (Exception ex)
             {
@@ -850,7 +853,7 @@ namespace DataAccess
             try
             {
                 var list = cc.Web.GetListByTitle(listName);
-                var views = cc.LoadQuery(list.Views.Include(v => v.Title, v => v.Id, v => v.Hidden));
+                var views = cc.LoadQuery(list.Views.Include(v => v.Title, v => v.Id, v => v.Hidden).Where(v => !v.Hidden));
                 cc.ExecuteQuery();
                 foreach (var view in views)
                 {

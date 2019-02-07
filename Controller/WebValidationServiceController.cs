@@ -190,6 +190,9 @@ namespace Controller
 
                 foreach (var userGroup in usersGroups)
                 {
+                    if (!this.SharePointRepository.GroupExists(TargetClientContext, userGroup.Key))
+                        continue;
+
                     foreach (var user in userGroup.Value)
                     {
                         string newUpn = user;
@@ -287,7 +290,7 @@ namespace Controller
                     webs = this.SharePointRepository.GetAllWebUrls(SourceClientContext);
 
                 foreach (var web in webs)
-                {                    
+                {
                     //var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + "/" + relativeUri.ToString());
                     var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + web.ToLower().Replace(sourceHost.ToLower(), ""));
                     if (!webExists)
