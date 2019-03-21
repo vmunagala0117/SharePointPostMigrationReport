@@ -16,11 +16,13 @@ namespace Common.Interfaces
         List<SPListItem> GetListItems(string listName);
         IEnumerable<string> GetListColumns(string listName);
         List<SPWebPart> GetWikiPageWebParts();
+        List<string> GetSiteGroups();
         List<string> GetWebGroups();
         List<string> GetWebCustomFields();
         IEnumerable<string> GetAllWebUrls();
         IEnumerable<string> GetSiteContentTypes();
         IDictionary<string, List<string>> GetWebUserGroups();
         IEnumerable<string> GetListViews(string listName);
+        List<SPWorkflow> GetWorkflows(string listName);
     }
 }

@@ -10,6 +10,7 @@ using NLog;
 using System.Collections.Concurrent;
 using Unity;
 using Unity.Resolution;
+using System.Linq;
 
 namespace Controller
 {
@@ -181,13 +182,11 @@ namespace Controller
                 {
                     IEnumerable<string> listFields = null;
                     if (SourceSiteCreds.SiteType == SiteType.WSS)
-                    {
                         listFields = this.SharePointRepository2007.GetListColumns(list);
-                    }
                     else
-                    {
                         listFields = this.SharePointRepository.GetListColumns(SourceClientContext, list);
-                    }
+
+
                     foreach (var listField in listFields)
                     {
                         if (!this.SharePointRepository.GetListFieldExistsByName(TargetClientContext, list, listField))
@@ -199,6 +198,42 @@ namespace Controller
                             });
                         }
                     }
+                }
+                catch (Exception ex)
+                {
+                    logger.Log(LogLevel.Error, ex);
+                }
+            }
+            return results;
+        }
+
+        public List<SPField> MissingListColumnsV1()
+        {
+            var results = new List<SPField>();
+            foreach (var list in this.GetExistingLists)
+            {
+                try
+                {
+                    IEnumerable<string> sourceListFields = null;
+                    IEnumerable<string> targetListFields = null;
+
+                    if (SourceSiteCreds.SiteType == SiteType.WSS)
+                        sourceListFields = this.SharePointRepository2007.GetListColumns(list);
+                    else
+                        sourceListFields = this.SharePointRepository.GetListColumns(SourceClientContext, list);
+
+                    if (TargetSiteCreds.SiteType == SiteType.WSS)
+                        targetListFields = this.SharePointRepository2007.GetSiteGroups();
+                    else
+                        targetListFields = this.SharePointRepository.GetSiteGroups(TargetClientContext);
+
+                    results = sourceListFields.Except(targetListFields)
+                        .Select(x => new SPField
+                        {
+                            Url = $"{TargetClientContext.Url}/Lists/{list}",
+                            FieldName = x
+                        })
+                        .ToList();
                 }
                 catch (Exception ex)
                 {
@@ -395,7 +430,7 @@ namespace Controller
                             ListBaseType = listItem.ListBaseType,
                             EncodedAbsUrl = listItem.EncodedAbsUrl,
                             Name = listItem.Name
-                        };                        
+                        };
                         //HashSet comparision - faster than List<> -- comparision based on the hashcode
                         int targetKeyHashCode = (useDefaultHashCode) ? transformSourceListItem.GetListItemDefaultHashCode() : transformSourceListItem.GetListItemHashCode();
                         if (!hashedListItems.ContainsKey(targetKeyHashCode))
@@ -412,7 +447,7 @@ namespace Controller
             }
             return results;
         }
-        
+
         public List<SPListItem> MissingListItemsByModifiedDate()
         {
             var results = new List<SPListItem>();
@@ -464,7 +499,7 @@ namespace Controller
                 }
                 else
                 {
-                    spWebParts = spWebParts = this.SharePointRepository.GetWikiPageWebParts(SourceClientContext);
+                    spWebParts = spWebParts = this.SharePointRepository.GetWebParts(SourceClientContext);
                 }
 
                 foreach (var webPart in spWebParts)
@@ -491,6 +526,44 @@ namespace Controller
             catch (Exception ex)
             {
                 logger.Log(LogLevel.Error, ex);
+            }
+            return results;
+        }
+
+        public List<SPWorkflow> MissingWorkflows()
+        {
+            var results = new List<SPWorkflow>();
+            foreach (var list in this.GetExistingLists)
+            {
+                try
+                {
+                    //get source list items
+                    IEnumerable<SPWorkflow> sourceListWorkflows = null;
+                    if (SourceSiteCreds.SiteType == SiteType.WSS)
+                    {
+                        //TODO
+                        sourceListWorkflows = this.SharePointRepository2007.GetWorkflows(list);
+                    }
+                    else
+                    {
+                        sourceListWorkflows = this.SharePointRepository.GetWorkflows(SourceClientContext, list);
+                    }
+
+                    if (sourceListWorkflows.Count() == 0)
+                        continue;
+
+                    IEnumerable<SPWorkflow> targetWorkflows = this.SharePointRepository.GetWorkflows(TargetClientContext, list);
+
+                    var listWorkflows = (from s in sourceListWorkflows
+                                         where !targetWorkflows.Any(t => s.WorkflowName == t.WorkflowName)
+                                         select s);
+                    if (listWorkflows.Any())
+                        results.AddRange(listWorkflows);
+                }
+                catch (Exception ex)
+                {
+                    logger.Log(LogLevel.Error, ex);
+                }
             }
             return results;
         }

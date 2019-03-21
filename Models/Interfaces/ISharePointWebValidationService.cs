@@ -12,8 +12,12 @@ namespace Common.Interfaces
         List<string> MissingContentTypes();
         List<SPField> MissingSiteColumns();
         List<string> MissingSites();
-        List<string> MissingGroups();
+        List<string> MissingSitesV1();
+        List<string> MissingSiteGroups();
+        List<string> MissingSiteGroupsV1();
+        List<string> MissingWebGroups();
         List<UserGroupStatus> MissingUsersInGroups();
         List<UserPermStatus> CheckUserPermissions();
+        List<SPWebUniquePermissions> CheckWebPermissionsInheritance();
     }
 }

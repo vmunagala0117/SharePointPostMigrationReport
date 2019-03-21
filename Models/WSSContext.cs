@@ -44,6 +44,7 @@ namespace Common
             GetUserGroups();
             GetViews();
             GetWebParts();
+            //GetWorkflows();
         }
         private void GetLists()
         {            
@@ -79,6 +80,15 @@ namespace Common
             WSSWebPartPages.Url = CurrentWebUrl + "/_vti_bin/WebPartPages.asmx";
             WSSWebPartPages.Credentials = GetCredentialObject();
         }
+
+        /*
+        private void GetWorkflows()
+        {
+            WSSWebPartPages = new WSSWorkflows.Workflows();
+            WSSWebPartPages.Url = CurrentWebUrl + "/_vti_bin/Workflow.asmx";
+            WSSWebPartPages.Credentials = GetCredentialObject();
+        }
+        */
 
         private ICredentials GetCredentialObject()
         {

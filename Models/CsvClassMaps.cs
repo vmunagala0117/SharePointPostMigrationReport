@@ -78,5 +78,24 @@ namespace Common
             Map(m => m.GroupName).Name("GroupName");
             Map(m => m.UserInGroupStatus).Name("UserInGroupStatus");
         }
-    }    
+    }
+    public sealed class SPWebUniquePermissionsClassMap : ClassMap<SPWebUniquePermissions>
+    {
+        public SPWebUniquePermissionsClassMap()
+        {
+            Map(m => m.WebUrl).Name("WebUrl");
+            Map(m => m.CurrentSetUniquePermissions).Name("CurrentSetUniquePermissions");
+            Map(m => m.ExpectedSetUniquePermissions).Name("ExpectedSetUniquePermissions");
+        }
+    }
+    public sealed class SPWorkflowClassMap : ClassMap<SPWorkflow>
+    {
+        public SPWorkflowClassMap()
+        {
+            Map(m => m.WebUrl).Name("WebUrl");
+            Map(m => m.ListTitle).Name("ListTitle");
+            Map(m => m.WorkflowName).Name("WorkflowName");
+            Map(m => m.WorkflowType).Name("WorkflowType");
+        }
+    }
 }

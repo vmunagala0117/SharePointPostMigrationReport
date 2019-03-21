@@ -282,7 +282,7 @@ namespace SiteValidation
             Task<List<string>> t_missingGroups = Task.Factory.StartNew<List<string>>(() =>
                 {
                     logger.Log(LogLevel.Info, $"Checking for missing web groups");
-                    return spWebValidationService.MissingGroups();
+                    return spWebValidationService.MissingWebGroups();
                 }
             );
 

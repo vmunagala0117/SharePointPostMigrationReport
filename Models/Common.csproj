@@ -177,6 +177,7 @@
     <Compile Include="Enums\UserStatus.cs" />
     <Compile Include="Enums\UserPermissions.cs" />
     <Compile Include="Enums\WebPartStatus.cs" />
+    <Compile Include="Enums\WorkflowType.cs" />
     <Compile Include="Interfaces\ISharePointRepository2007.cs" />
     <Compile Include="PermStatus.cs" />
     <Compile Include="Interfaces\ISharePointListValidationService.cs" />
@@ -192,10 +193,12 @@
     <Compile Include="SPAlert.cs" />
     <Compile Include="SPConnection.cs" />
     <Compile Include="SPField.cs" />
+    <Compile Include="SPWebUniquePermissions.cs" />
     <Compile Include="SPListItem.cs" />
     <Compile Include="SPListView.cs" />
     <Compile Include="SPListItemCount.cs" />
     <Compile Include="SPWebPart.cs" />
+    <Compile Include="SPWorkflows.cs" />
     <Compile Include="UserMapping.cs" />
     <Compile Include="UserGroupStatus.cs" />
     <Compile Include="UserPermStatus.cs" />

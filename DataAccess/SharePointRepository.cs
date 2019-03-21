@@ -14,7 +14,7 @@ using Microsoft.SharePoint.Client.WebParts;
 using Polly;
 using Microsoft.SharePoint.Client.UserProfiles;
 using System.Threading;
-
+using Microsoft.SharePoint.Client.WorkflowServices;
 
 namespace DataAccess
 {
@@ -117,7 +117,7 @@ namespace DataAccess
             }
         }
 
-        public IDictionary<string, List<string>> GetWebUserGroups(ClientContext cc)
+        public IDictionary<string, List<string>> GetSiteUserGroups(ClientContext cc)
         {
             var results = new Dictionary<string, List<string>>();
             try
@@ -141,12 +141,38 @@ namespace DataAccess
             return results;
         }
 
+        public bool DoesWebContainsUniquePermissions(ClientContext cc)
+        {
+            cc.Load(cc.Web, w => w.HasUniqueRoleAssignments);
+            cc.ExecuteQuery();
+            return cc.Web.HasUniqueRoleAssignments;
+        }
+
+        public List<string> GetSiteGroups(ClientContext cc)
+        {
+            var results = new List<string>();
+            try
+            {
+                var groups = cc.LoadQuery(cc.Web.SiteGroups.Include(g => g.Title));
+                cc.ExecuteQuery();
+                foreach (var group in groups)
+                {
+                    results.Add(group.Title);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Log(LogLevel.Error, ex, cc.Url);
+            }
+            return results;
+        }
+
         public List<string> GetWebGroups(ClientContext cc)
         {
             var results = new List<string>();
             try
             {
-                var groups = cc.LoadQuery(cc.Web.SiteGroups.Include(g => g.Title, g => g.Users));
+                var groups = cc.LoadQuery(cc.Web.RoleAssignments.Groups.Include(g => g.LoginName, g => g.PrincipalType, g => g.Title));
                 cc.ExecuteQuery();
                 foreach (var group in groups)
                 {
@@ -553,7 +579,7 @@ namespace DataAccess
                     cc.Load(listItems);
                     cc.ExecuteQuery();
 
-                    itemPosition = listItems.ListItemCollectionPosition;                   
+                    itemPosition = listItems.ListItemCollectionPosition;
 
                     foreach (ListItem listItem in listItems)
                     {
@@ -792,7 +818,7 @@ namespace DataAccess
         }
 
         //Get WikiPage Webparts
-        public List<SPWebPart> GetWikiPageWebParts(ClientContext cc)
+        public List<SPWebPart> GetWebParts(ClientContext cc)
         {
             try
             {
@@ -943,6 +969,56 @@ namespace DataAccess
                 }
             }
             cc.ExecuteQuery();
+        }
+
+        public List<SPWorkflow> GetWorkflows(ClientContext cc, string listName)
+        {
+            try
+            {
+                var result = new List<SPWorkflow>();
+                var list = cc.Web.GetListByTitle(listName);
+
+                var wfServicesManager = new WorkflowServicesManager(cc, cc.Web);
+                var wfSubscriptionService = wfServicesManager.GetWorkflowSubscriptionService();
+                var wfSubscriptionCollection = wfSubscriptionService.EnumerateSubscriptionsByList(list.Id);
+                cc.Load(wfSubscriptionCollection);
+                cc.ExecuteQuery();
+                foreach (var wfSubscription in wfSubscriptionCollection)
+                {
+                    if (wfSubscription.Name.Contains("Previous Versions"))
+                        continue;
+                    //2013
+                    result.Add(new SPWorkflow()
+                    {
+                        ListTitle = listName,
+                        WebUrl = cc.Url,
+                        WorkflowName = wfSubscription.Name,
+                        WorkflowType = WorkflowType.SP2013
+                    });
+                }
+
+                var wfAssociations = cc.LoadQuery(list.WorkflowAssociations.Include(w => w.Name, w => w.Id, w => w.InternalName, w => w.IsDeclarative));
+                cc.ExecuteQuery();
+                foreach (var wfAssociation in wfAssociations)
+                {
+                    if (wfAssociation.Name.Contains("Previous Versions"))
+                        continue;
+                    //2010
+                    result.Add(new SPWorkflow()
+                    {
+                        ListTitle = listName,
+                        WebUrl = cc.Url,
+                        WorkflowName = wfAssociation.Name,
+                        WorkflowType = WorkflowType.SP2010
+                    });
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                logger.Log(LogLevel.Error, ex, $"Site:{cc.Url}");
+                throw ex;
+            }
         }
     }
 }

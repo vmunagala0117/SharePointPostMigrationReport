@@ -13,6 +13,7 @@ using CsvHelper;
 using NLog;
 using Unity;
 using Unity.Resolution;
+using System.Diagnostics;
 
 namespace SiteValidation
 {
@@ -21,8 +22,10 @@ namespace SiteValidation
         //Initialize csvWriter & DirectoryInfo object
         public static CsvWriter csv = null;
         public static DirectoryInfo dirInfo = null;
-
+        //Initialize logger
         private static readonly ILogger logger = LogManager.GetCurrentClassLogger();
+        //Initialize timer to check elapsed time for each function
+        private static Stopwatch watch = Stopwatch.StartNew();
 
         static void Main(string[] args)
         {
@@ -84,16 +87,23 @@ namespace SiteValidation
                     logger.Log(LogLevel.Info, $"Validating Sites and Lists for {targetSiteUrl}");
 
                     logger.Log(LogLevel.Info, $"Checking for missing sites");
-                    var missingSites = spWebValidationService.MissingSites();
+
+                    watch.Restart();
+                    var missingSites = spWebValidationService.MissingSitesV1();
+                    watch.Stop();
+                    logger.Log(LogLevel.Info, $"Missing Sites Elapsed Time: {watch.Elapsed.Seconds}");
 
                     if (missingSites.Count > 0)
                         CsvWriterHelper.WriteCsvRecords(missingSites, Path.Combine(dirInfo.FullName, "missingSites.csv"));
 
                     //Perform site collection operations
-                    //SiteCollectionValidationOperations(spWebValidationService);
+                    SiteCollectionValidationOperations(spWebValidationService);
 
                     //Perform web & list operations
                     var webUrls = spWebValidationService.GetAllSourceWebUrls();
+
+                    //TODO: Revisit this again
+                    /*
                     if (webUrls.Count() == 1)
                     {
                         if (webUrls.First().ToLower() == sourceSiteUrl.ToLower())
@@ -103,6 +113,8 @@ namespace SiteValidation
                         }
                         continue;
                     }
+                    */
+
                     foreach (var webUrl in webUrls)
                     {
 
@@ -123,7 +135,7 @@ namespace SiteValidation
                         // relative URL --> the very last part
                         var relativeUrl = webUrl.ToLower().Replace(sourceSiteUrl.ToLower(), "");
 
-                        targetSiteUrl = ConfigurationManager.AppSettings["TargetSiteHost"]  + sRelativeUrl + relativeUrl;
+                        targetSiteUrl = ConfigurationManager.AppSettings["TargetSiteHost"] + sRelativeUrl + relativeUrl;
 
                         targetFilePath = Path.Combine(ConfigurationManager.AppSettings["LogDirectory"], (targetSiteUrl.Contains("https://") ? targetSiteUrl.Replace("https://", "") : targetSiteUrl.Replace("http://", "")));
                         dirInfo = Directory.CreateDirectory(targetFilePath);
@@ -163,39 +175,59 @@ namespace SiteValidation
                 logger.Log(LogLevel.Error, ex);
             }
         }
-        private static void WebValidationOperations(ISharePointWebValidationService spWebValidationService)
-        {
-            /*
-            logger.Log(LogLevel.Info, $"Checking for missing web groups");
-            var missingGroups = spWebValidationService.MissingGroups();
-            if (missingGroups.Count > 0)
-                CsvWriterHelper.WriteCsvRecords(missingGroups, Path.Combine(dirInfo.FullName, "missingGroups.csv"));
-
-            logger.Log(LogLevel.Info, $"Checking for missing users in groups");
-            var missingUsersInGroups = spWebValidationService.MissingUsersInGroups();
-            if (missingUsersInGroups.Count > 0)
-                CsvWriterHelper.WriteCsvRecords(missingUsersInGroups, Path.Combine(dirInfo.FullName, "missingUsersInGroups.csv"));
-        */
-            }
-
         private static void SiteCollectionValidationOperations(ISharePointWebValidationService spWebValidationService)
         {
-            logger.Log(LogLevel.Info, $"Checking for site user permissions");
-            var mismatchUserPerms = spWebValidationService.CheckUserPermissions();
-            if (mismatchUserPerms.Count > 0)
-                CsvWriterHelper.WriteCsvRecords(mismatchUserPerms, Path.Combine(dirInfo.FullName, "mismatchUserPerms.csv"));
-
+            watch.Restart();
             logger.Log(LogLevel.Info, $"Checking for missing site content types");
             var missingContentTypes = spWebValidationService.MissingContentTypes();
             if (missingContentTypes.Count > 0)
                 CsvWriterHelper.WriteCsvRecords(missingContentTypes, Path.Combine(dirInfo.FullName, "missingContentTypes.csv"));
+            watch.Stop();
+            logger.Log(LogLevel.Info, $"Missing site content types Elapsed Time: {watch.Elapsed.Seconds}");
 
+            watch.Restart();
             logger.Log(LogLevel.Info, $"Checking for missing site columns");
             var missingSiteColumns = spWebValidationService.MissingSiteColumns();
             if (missingSiteColumns.Count > 0)
                 CsvWriterHelper.WriteCsvRecords(missingSiteColumns, Path.Combine(dirInfo.FullName, "missingSiteColumns.csv"));
+            watch.Stop();
+            logger.Log(LogLevel.Info, $"Missing site columns elapsed time: {watch.Elapsed.Seconds}");
 
+            logger.Log(LogLevel.Info, $"Checking for missing site groups");
+            var missingGroups = spWebValidationService.MissingSiteGroupsV1();
+            if (missingGroups.Count > 0)
+                CsvWriterHelper.WriteCsvRecords(missingGroups, Path.Combine(dirInfo.FullName, "missingSiteGroups.csv"));
+            watch.Stop();
+            logger.Log(LogLevel.Info, $"Missing Site Groups Elapsed Time: {watch.Elapsed.Seconds}");
+
+            //TODO: custom permission levels
+            /*
+            logger.Log(LogLevel.Info, $"Checking for missing users in groups");
+            var missingUsersInGroups = spWebValidationService.MissingUsersInGroups();
+            if (missingUsersInGroups.Count > 0)
+                CsvWriterHelper.WriteCsvRecords(missingUsersInGroups, Path.Combine(dirInfo.FullName, "missingUsersInGroups.csv"));
+
+            
+            logger.Log(LogLevel.Info, $"Checking for site user permissions");
+            var mismatchUserPerms = spWebValidationService.CheckUserPermissions();
+            if (mismatchUserPerms.Count > 0)
+                CsvWriterHelper.WriteCsvRecords(mismatchUserPerms, Path.Combine(dirInfo.FullName, "mismatchUserPerms.csv"));
+            */
         }
+
+        private static void WebValidationOperations(ISharePointWebValidationService spWebValidationService)
+        {
+            logger.Log(LogLevel.Info, $"Checking for mismatches in web permissions inheritance");
+            var mismatchWebPermsInheritance = spWebValidationService.CheckWebPermissionsInheritance();
+            if (mismatchWebPermsInheritance.Count > 0)
+                CsvWriterHelper.WriteCsvRecords(mismatchWebPermsInheritance, Path.Combine(dirInfo.FullName, "mismatchWebPermsInheritance.csv"));
+
+            logger.Log(LogLevel.Info, $"Checking for missing web groups");
+            var missingGroups = spWebValidationService.MissingWebGroups();
+            if (missingGroups.Count > 0)
+                CsvWriterHelper.WriteCsvRecords(missingGroups, Path.Combine(dirInfo.FullName, "missingWebGroups.csv"));
+        }
+
         private static void ListValidationOperations(ISharePointListValidationService spListValidationService)
         {
 
@@ -209,22 +241,21 @@ namespace SiteValidation
             if (listItemsCountMismatch.Count > 0)
                 CsvWriterHelper.WriteCsvRecords(listItemsCountMismatch, Path.Combine(dirInfo.FullName, "listItemsCountMismatch.csv"));
 
-            /*
             logger.Log(LogLevel.Info, $"Checking for missing list fields");
-            var missingFields = spListValidationService.MissingListColumns();
+            var missingFields = spListValidationService.MissingListColumnsV1();
             if (missingFields.Count > 0)
                 CsvWriterHelper.WriteCsvRecords(missingFields, Path.Combine(dirInfo.FullName, "missingFields.csv"));
-            */
+
             logger.Log(LogLevel.Info, $"Checking for missing list views");
             var missingListViews = spListValidationService.MissingListViews();
             if (missingListViews.Count > 0)
                 CsvWriterHelper.WriteCsvRecords(missingListViews, Path.Combine(dirInfo.FullName, "missingListViews.csv"));
 
-
             logger.Log(LogLevel.Info, $"Checking for missing list items");
             var missingListItems = spListValidationService.MissingListItemsV1();
             if (missingListItems.Count > 0)
                 CsvWriterHelper.WriteCsvRecords(missingListItems, Path.Combine(dirInfo.FullName, "missingListItems.csv"));
+
 
             /*
             logger.Log(LogLevel.Info, $"Checking for missing list items by modified date");
@@ -232,10 +263,17 @@ namespace SiteValidation
             if (missingListItemsByModifiedDate.Count > 0)
                 CsvWriterHelper.WriteCsvRecords(missingListItemsByModifiedDate, Path.Combine(dirInfo.FullName, "missingListItemsByModifiedDate.csv"));
             */
+
             logger.Log(LogLevel.Info, $"Checking for missing webparts");
             var missingWebParts = spListValidationService.MissingWebParts();
             if (missingWebParts.Count > 0)
                 CsvWriterHelper.WriteCsvRecords(missingWebParts, Path.Combine(dirInfo.FullName, "missingWebParts.csv"));
+
+            logger.Log(LogLevel.Info, $"Checking for missing worflows");
+            var missingWorkflows = spListValidationService.MissingWorkflows();
+            if (missingWorkflows.Count > 0)
+                CsvWriterHelper.WriteCsvRecords(missingWorkflows, Path.Combine(dirInfo.FullName, "missingWorkflows.csv"));
+
         }
     }
 }

@@ -9,6 +9,7 @@ using Common.Enums;
 using NLog;
 using Unity;
 using Unity.Resolution;
+using System.Linq;
 
 namespace Controller
 {
@@ -66,6 +67,7 @@ namespace Controller
             this.UserMapping = userMapping;
             this.logger = logger;
         }
+
         public IEnumerable<string> GetAllSourceWebUrls()
         {
             try
@@ -80,6 +82,7 @@ namespace Controller
                 throw ex;
             }
         }
+
         public List<UserPermStatus> CheckUserPermissions()
         {
             var results = new List<UserPermStatus>();
@@ -152,11 +155,68 @@ namespace Controller
             return results;
         }
 
-        public List<string> MissingGroups()
+        public List<string> MissingSiteGroups()
         {
             var results = new List<string>();
             try
             {
+                List<string> groups = null;
+                if (SourceSiteCreds.SiteType == SiteType.WSS)
+                    groups = this.SharePointRepository2007.GetSiteGroups();
+                else
+                    groups = this.SharePointRepository.GetSiteGroups(SourceClientContext);
+                foreach (var group in groups)
+                {
+                    if (!this.SharePointRepository.GroupExists(TargetClientContext, group))
+                    {
+                        results.Add(group);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Log(LogLevel.Error, ex);
+            }
+            return results;
+        }
+
+        public List<string> MissingSiteGroupsV1()
+        {
+            var results = new List<string>();
+            try
+            {
+                List<string> sourceGroups = null;
+                List<string> targetGroups = null;
+
+                if (SourceSiteCreds.SiteType == SiteType.WSS)
+                    sourceGroups = this.SharePointRepository2007.GetSiteGroups();
+                else
+                    sourceGroups = this.SharePointRepository.GetSiteGroups(SourceClientContext);
+
+                if (TargetSiteCreds.SiteType == SiteType.WSS)
+                    targetGroups = this.SharePointRepository2007.GetSiteGroups();
+                else
+                    targetGroups = this.SharePointRepository.GetSiteGroups(TargetClientContext);
+
+                results = sourceGroups.Except(targetGroups).ToList();
+            }
+            catch (Exception ex)
+            {
+                logger.Log(LogLevel.Error, ex);
+            }
+            return results;
+        }
+
+        public List<string> MissingWebGroups()
+        {
+            var results = new List<string>();
+            try
+            {
+                //Check for inheritance first .. if there is no inheritance then check for groups
+                var DoesSourcHasUniquePermissions = this.SharePointRepository.DoesWebContainsUniquePermissions(SourceClientContext);
+                if (!DoesSourcHasUniquePermissions)
+                    return results; //no need to check since we already checked groups at the site level
+
                 List<string> groups = null;
                 if (SourceSiteCreds.SiteType == SiteType.WSS)
                     groups = this.SharePointRepository2007.GetWebGroups();
@@ -184,9 +244,10 @@ namespace Controller
             {
                 IDictionary<string, List<string>> usersGroups = null;
                 if (SourceSiteCreds.SiteType == SiteType.WSS)
+                    //TODO: Get 
                     usersGroups = this.SharePointRepository2007.GetWebUserGroups();
                 else
-                    usersGroups = this.SharePointRepository.GetWebUserGroups(SourceClientContext);
+                    usersGroups = this.SharePointRepository.GetSiteUserGroups(SourceClientContext);
 
                 foreach (var userGroup in usersGroups)
                 {
@@ -275,12 +336,9 @@ namespace Controller
 
                 //Get source host URI
                 Uri sourceUri = new Uri(SourceSiteCreds.SiteUrl);
-                //string sourceHost = sourceUri.GetLeftPart(UriPartial.Authority).ToString();
                 string sourceHost = SourceSiteCreds.SiteUrl;
                 if (!String.IsNullOrEmpty(SourceSiteCreds.WebRelativeUrl))
                     sourceHost = sourceHost.Replace(SourceSiteCreds.WebRelativeUrl, "");
-
-                Uri sourceHostUri = new Uri(sourceHost);
 
                 //Get all webs from the source
                 IEnumerable<string> webs = null;
@@ -291,7 +349,6 @@ namespace Controller
 
                 foreach (var web in webs)
                 {
-                    //var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + "/" + relativeUri.ToString());
                     var webExists = this.SharePointRepository.WebExists(TargetClientContext, targetHost + web.ToLower().Replace(sourceHost.ToLower(), ""));
                     if (!webExists)
                     {
@@ -304,6 +361,98 @@ namespace Controller
                 logger.Log(LogLevel.Error, ex);
             }
             return missingSites;
+        }
+
+        public List<string> MissingSitesV1()
+        {
+            var missingSites = new List<string>();
+            try
+            {
+                //Get target host URI
+                Uri targetUri = new Uri(TargetSiteCreds.SiteUrl);
+                //string targetHost = targetUri.GetLeftPart(UriPartial.Authority);
+                string targetHost = TargetSiteCreds.SiteUrl;
+                if (!String.IsNullOrEmpty(TargetSiteCreds.WebRelativeUrl))
+                    targetHost = targetHost.Replace(TargetSiteCreds.WebRelativeUrl, "");
+
+                //Get source host URI
+                Uri sourceUri = new Uri(SourceSiteCreds.SiteUrl);
+                string sourceHost = SourceSiteCreds.SiteUrl;
+                if (!String.IsNullOrEmpty(SourceSiteCreds.WebRelativeUrl))
+                    sourceHost = sourceHost.Replace(SourceSiteCreds.WebRelativeUrl, "");
+
+                //Get all webs from the source
+                IEnumerable<string> sourceWebs = null;
+                if (SourceSiteCreds.SiteType == SiteType.WSS)
+                    sourceWebs = this.SharePointRepository2007.GetAllWebUrls();
+                else
+                    sourceWebs = this.SharePointRepository.GetAllWebUrls(SourceClientContext);
+                sourceWebs = sourceWebs.Select(e => e.ToLower().Replace(sourceHost.ToLower(), ""));
+
+                //Get all webs from the target
+                IEnumerable<string> targetWebs = null;
+                if (TargetSiteCreds.SiteType == SiteType.WSS)
+                    targetWebs = this.SharePointRepository2007.GetAllWebUrls();
+                else
+                    targetWebs = this.SharePointRepository.GetAllWebUrls(TargetClientContext);
+                targetWebs = targetWebs.Select(e => e.ToLower().Replace(targetHost.ToLower(), ""));
+
+                //missingSites = sourceWebs.Except(targetWebs).ToList();
+                var tempMissingSites = (from s in sourceWebs
+                                        where !targetWebs.Any(t => t == s)
+                                        select $"{sourceHost.ToLower()}{s}");
+
+                if (tempMissingSites.Any())
+                    missingSites = tempMissingSites.ToList();
+
+                #region Using HashKey
+                /*
+                //key is hashcode, while value is the actual webUrl
+                Dictionary<int, string> hashedTargetWebsList = new Dictionary<int, string>();
+                foreach (var targetWeb in targetWebs)
+                {
+                    hashedTargetWebsList.Add(targetWeb.GetHashCode(), targetWeb);
+                }
+
+                foreach (var sourceWeb in sourceWebs)
+                {
+                    if (!hashedTargetWebsList.ContainsKey(sourceWeb.GetHashCode()))
+                        missingSites.Add($"{sourceHost.ToLower()}{sourceWeb}");
+                }
+                */
+                #endregion
+            }
+            catch (Exception ex)
+            {
+                logger.Log(LogLevel.Error, ex);
+            }
+
+            return missingSites;
+        }
+
+        public List<SPWebUniquePermissions> CheckWebPermissionsInheritance()
+        {
+            List<SPWebUniquePermissions> mismatchPermissionsInheritance = new List<SPWebUniquePermissions>();
+            try
+            {
+                //TODO for check for SP 2007
+                var doesWebHaveUniquePermissionsInSource = this.SharePointRepository.DoesWebContainsUniquePermissions(SourceClientContext);
+                var doesWebHaveUniquePermissionsInTarget = this.SharePointRepository.DoesWebContainsUniquePermissions(TargetClientContext);
+                if (doesWebHaveUniquePermissionsInSource != doesWebHaveUniquePermissionsInTarget)
+                {
+                    mismatchPermissionsInheritance.Add(new SPWebUniquePermissions()
+                    {
+                        WebUrl = TargetClientContext.Url,
+                        CurrentSetUniquePermissions = doesWebHaveUniquePermissionsInTarget,
+                        ExpectedSetUniquePermissions = doesWebHaveUniquePermissionsInSource
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Log(LogLevel.Error, ex);
+            }
+            return mismatchPermissionsInheritance;
         }
     }
 }

@@ -87,6 +87,22 @@ namespace Common
                     csv.WriteRecords(records);
                 }
             }
+            else if (t == typeof(SPWebUniquePermissions))
+            {
+                using (var csv = new CsvWriter(File.CreateText(fullPathFileName)))
+                {
+                    csv.Configuration.RegisterClassMap<SPWebUniquePermissionsClassMap>();
+                    csv.WriteRecords(records);
+                }
+            }
+            else if (t == typeof(SPWorkflow))
+            {
+                using (var csv = new CsvWriter(File.CreateText(fullPathFileName)))
+                {
+                    csv.Configuration.RegisterClassMap<SPWorkflowClassMap>();
+                    csv.WriteRecords(records);
+                }
+            }
             else
             {
                 throw new NotImplementedException();

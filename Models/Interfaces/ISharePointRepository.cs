@@ -14,8 +14,10 @@ namespace Common.Interfaces
         ClientContext GetSP2013Context(string siteUrl, string userName, string passWord, string domain);
         IEnumerable<string> GetAllWebUrls(ClientContext cc);
         bool WebExists(ClientContext cc, string url);
+        bool DoesWebContainsUniquePermissions(ClientContext cc);
+        List<string> GetSiteGroups(ClientContext cc);
         List<string> GetWebGroups(ClientContext cc);
-        IDictionary<string, List<string>> GetWebUserGroups(ClientContext cc);
+        IDictionary<string, List<string>> GetSiteUserGroups(ClientContext cc);
         bool GroupExists(ClientContext cc, string groupTitle);
         bool UserExistsInGroup(ClientContext cc, string groupTitle, string userLoginName);
         IEnumerable<string> GetSiteContentTypes(ClientContext cc);
@@ -39,7 +41,8 @@ namespace Common.Interfaces
         bool GetListItemExists(ClientContext cc, string listName, SPListItem listItem);
         bool GetListItemExistsByModifiedDate(ClientContext cc, string listName, SPListItem listItem);
         void GetListPermissions(ClientContext cc, string listName);
-        List<SPWebPart> GetWikiPageWebParts(ClientContext cc);
+        List<SPWebPart> GetWebParts(ClientContext cc);
         bool CheckIfWebPartPresent(ClientContext cc, string fileRelativeUrl, string webPartTitle);
+        List<SPWorkflow> GetWorkflows(ClientContext cc, string listName);
     }
 }

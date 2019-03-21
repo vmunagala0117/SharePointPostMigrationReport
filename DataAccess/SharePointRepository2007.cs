@@ -33,6 +33,23 @@ namespace DataAccess
             return SPContext;
         }
 
+        #region Site Operations
+        public List<string> GetSiteGroups()
+        {
+            try
+            {
+                XmlNode xn = SPContext.WSSUserGroup.GetGroupCollectionFromSite();
+                var elements = xn.GetChildElements().Elements();
+                var groups = elements.Select(e => e.Attribute("Name").Value);
+                return groups.ToList();
+            }
+            catch (Exception ex)
+            {
+                logger.Log(LogLevel.Error, ex, $"Site:{SPContext.WSSUserGroup.Url}");
+                throw ex;
+            }
+        }
+        #endregion
 
         #region List Operations
         public IEnumerable<string> GetLists()
@@ -252,7 +269,7 @@ namespace DataAccess
                         var webPartNodes = htmlDocument.DocumentNode.SelectNodes("//webpart");
                         if (webPartNodes == null)
                             continue;
-                        foreach(var webPart in webPartNodes)
+                        foreach (var webPart in webPartNodes)
                         {
                             var title = webPart.SelectSingleNode("title").InnerText;
                             var isVisible = webPart.SelectSingleNode("isvisible").InnerText;
@@ -262,7 +279,7 @@ namespace DataAccess
                                 FileRelativeUrl = item.FileRef,
                                 WebPartTitle = title,
                                 WebPartStatus = (isVisible.ToLower() == "false") ? WebPartStatus.Hidden : WebPartStatus.Present
-                            });                            
+                            });
                         }
                     }
                 }
@@ -273,6 +290,11 @@ namespace DataAccess
                 logger.Log(LogLevel.Error, ex, $"Site:{SPContext.WSSWebPartPages.Url}");
                 throw ex;
             }
+        }
+
+        public List<SPWorkflow> GetWorkflows(string listName)
+        {
+            throw new NotImplementedException();
         }
         #endregion
 
@@ -291,7 +313,13 @@ namespace DataAccess
                 logger.Log(LogLevel.Error, ex, $"Site:{SPContext.WSSUserGroup.Url}");
                 throw ex;
             }
-            return null;
+        }
+
+        //TODO
+        public bool DoesWebContainsUniquePermissions(string webUrl)
+        {
+            XmlNode xn = SPContext.WSSWebs.GetWeb(webUrl);
+            return false;
         }
 
         public List<string> GetWebCustomFields()
@@ -386,7 +414,7 @@ namespace DataAccess
                 logger.Log(LogLevel.Error, ex, $"Site:{SPContext.WSSWebs.Url}");
                 throw ex;
             }
-        }
+        }        
         #endregion
     }
 }
