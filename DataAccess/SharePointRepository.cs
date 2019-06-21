@@ -978,30 +978,37 @@ namespace DataAccess
                 var result = new List<SPWorkflow>();
                 var list = cc.Web.GetListByTitle(listName);
 
-                var wfServicesManager = new WorkflowServicesManager(cc, cc.Web);
-                var wfSubscriptionService = wfServicesManager.GetWorkflowSubscriptionService();
-                var wfSubscriptionCollection = wfSubscriptionService.EnumerateSubscriptionsByList(list.Id);
-                cc.Load(wfSubscriptionCollection);
-                cc.ExecuteQuery();
-                foreach (var wfSubscription in wfSubscriptionCollection)
+                try
                 {
-                    if (wfSubscription.Name.Contains("Previous Versions"))
-                        continue;
-                    //2013
-                    result.Add(new SPWorkflow()
+                    var wfServicesManager = new WorkflowServicesManager(cc, cc.Web);
+                    var wfSubscriptionService = wfServicesManager.GetWorkflowSubscriptionService();
+                    var wfSubscriptionCollection = wfSubscriptionService.EnumerateSubscriptionsByList(list.Id);
+                    cc.Load(wfSubscriptionCollection);
+                    cc.ExecuteQuery();
+                    foreach (var wfSubscription in wfSubscriptionCollection)
                     {
-                        ListTitle = listName,
-                        WebUrl = cc.Url,
-                        WorkflowName = wfSubscription.Name,
-                        WorkflowType = WorkflowType.SP2013
-                    });
+                        if (wfSubscription.Name.Contains("Previous Version"))
+                            continue;
+                        //2013
+                        result.Add(new SPWorkflow()
+                        {
+                            ListTitle = listName,
+                            WebUrl = cc.Url,
+                            WorkflowName = wfSubscription.Name,
+                            WorkflowType = WorkflowType.SP2013
+                        });
+                    }
                 }
-
+                catch (Exception wfEx)
+                {
+                    logger.Log(LogLevel.Error, wfEx, $"Site:{cc.Url}");
+                }
+                //2010
                 var wfAssociations = cc.LoadQuery(list.WorkflowAssociations.Include(w => w.Name, w => w.Id, w => w.InternalName, w => w.IsDeclarative));
                 cc.ExecuteQuery();
                 foreach (var wfAssociation in wfAssociations)
                 {
-                    if (wfAssociation.Name.Contains("Previous Versions"))
+                    if (wfAssociation.Name.Contains("Previous Version"))
                         continue;
                     //2010
                     result.Add(new SPWorkflow()
